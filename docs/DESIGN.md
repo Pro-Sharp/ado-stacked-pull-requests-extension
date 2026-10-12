@@ -1,6 +1,17 @@
 # Stacked Pull Requests for Azure DevOps — Design & Implementation Plan
 
-Status: draft v1 · 2026-10-12
+Status: original design (2026-10-12). The implementation follows it with the changes below; see [ARCHITECTURE.md](ARCHITECTURE.md) for the as-built description.
+
+## Decisions and deviations
+
+- **No "team" filter.** The list shows the PRs of the whole project across all repositories, with a repository filter. Stacks are detected per repository.
+- **Approvals are per PR.** A vote, comment or status is always sent to the PR being reviewed, never to its parent or children. No "layer approval" semantics exist; the optional merge-order status is the only cross-PR safeguard.
+- **PR tab context** is `{ pullRequestId, repositoryId }` (from `PullRequestTabExtensionConfig` in the API package).
+- **No `azure-devops-ui`.** Plain React 16 + SCSS with host theme variables; custom diff renderer (no Monaco, no `react-diff-view`).
+- **Diff** uses the `diff` package; layer base is the merge base of the parent and child tips.
+- **SDK 4.x**, `azure-devops-extension-api` 5.x, webpack 5, TypeScript 5, Vitest.
+- Milestones M0-M6 are implemented in the first version except automated verification in a real organization (see DEVELOPMENT.md); M7 (backend) is not built.
+
 
 ## 1. Problem
 

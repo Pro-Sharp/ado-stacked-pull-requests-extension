@@ -97,7 +97,6 @@ export function Overview({ pr, raw, iterations, threads, statuses, policies, onC
           </span>
           <div>
             <div>{pr.mergeStatus === "conflicts" ? "Merge conflicts" : pr.mergeStatus === "succeeded" ? "No merge conflicts" : "Checking for merge conflicts"}</div>
-            {pr.mergeStatus === "succeeded" && <div className="sub">Last checked {shortDate(raw.lastMergeCommit ? raw.creationDate : raw.creationDate)}</div>}
           </div>
         </div>
         {policies.length > 0 && (
