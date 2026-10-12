@@ -1,0 +1,6 @@
+{
+  "id": "stacked-pull-requests-dev",
+  "name": "Stacked Pull Requests (Dev)",
+  "public": false,
+  "baseUri": "https://localhost:3000"
+}
