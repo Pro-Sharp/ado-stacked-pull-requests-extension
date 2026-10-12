@@ -6,6 +6,7 @@ export interface Navigator {
   openList(): void;
   /** URL of the native PR page, for "Open in Azure DevOps" links. */
   nativeUrl(repoName: string, prId: number): string;
+  workItemUrl(id: string): string;
 }
 
 export const ServiceContext = React.createContext<StackedPrService | undefined>(undefined);

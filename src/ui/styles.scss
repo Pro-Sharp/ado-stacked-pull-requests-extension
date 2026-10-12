@@ -405,32 +405,33 @@ button {
     &:last-child {
       border-bottom: 0;
     }
-    .dot {
-      width: 22px;
-      height: 22px;
-      border-radius: 50%;
-      flex: none;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      font-size: 13px;
-      background: var(--sp-success);
-      &.pending {
-        background: transparent;
-        border: 1px solid var(--sp-text-2);
-      }
-      &.warn {
-        background: var(--sp-warn);
-      }
-      &.fail {
-        background: var(--sp-danger);
-      }
-    }
     .sub {
       font-size: 11px;
       color: var(--sp-text-2);
     }
+  }
+}
+
+.dot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 13px;
+  background: var(--sp-success);
+  &.pending {
+    background: transparent;
+    border: 1px solid var(--sp-text-2);
+  }
+  &.warn {
+    background: var(--sp-warn);
+  }
+  &.fail {
+    background: var(--sp-danger);
   }
 }
 

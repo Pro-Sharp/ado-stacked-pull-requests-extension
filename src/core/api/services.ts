@@ -281,6 +281,10 @@ export class StackedPrService {
     return this.git.getPullRequestIterations(repoId, id, this.ctx.projectName);
   }
 
+  getIterationCommits(repoId: string, id: number, iterationId: number) {
+    return this.git.getPullRequestIterationCommits(repoId, id, iterationId, this.ctx.projectName);
+  }
+
   async getCommits(repoId: string, id: number) {
     return this.git.getPullRequestCommits(repoId, id, this.ctx.projectName);
   }
@@ -356,6 +360,36 @@ export class StackedPrService {
 
   createThread(pr: PrInfo, thread: GitPullRequestCommentThread): Promise<GitPullRequestCommentThread> {
     return this.git.createThread(thread, pr.repositoryId, pr.id, this.ctx.projectName);
+  }
+
+  /** Identity search for the reviewer picker (Identity Picker REST API, needs the vso.identity scope). */
+  async searchIdentities(query: string): Promise<{ id: string; displayName: string; mail?: string }[]> {
+    if (query.trim().length < 2) return [];
+    const token = await SDK.getAccessToken();
+    const org = SDK.getHost().name;
+    const res = await fetch(`https://dev.azure.com/${org}/_apis/IdentityPicker/Identities?api-version=7.1-preview.1`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        query,
+        identityTypes: ["user", "group"],
+        operationScopes: ["ims", "source"],
+        options: { MinResults: 5, MaxResults: 8 },
+        properties: ["DisplayName", "Mail", "LocalId"]
+      })
+    });
+    if (!res.ok) throw new Error(`Identity search failed (${res.status})`);
+    const body = await res.json();
+    const found = (body.results?.[0]?.identities ?? []) as { localId?: string; entityId?: string; displayName: string; mail?: string }[];
+    return found.filter((i) => i.localId).map((i) => ({ id: i.localId!, displayName: i.displayName, mail: i.mail }));
+  }
+
+  addLabel(pr: PrInfo, name: string) {
+    return this.git.createPullRequestLabel({ name } as never, pr.repositoryId, pr.id, this.ctx.projectName, this.ctx.projectId);
+  }
+
+  removeLabel(pr: PrInfo, name: string) {
+    return this.git.deletePullRequestLabels(pr.repositoryId, pr.id, name, this.ctx.projectName, this.ctx.projectId);
   }
 
   /** Posts / refreshes the optional "parent merged" gate status that a branch policy can require. */

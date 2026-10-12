@@ -142,3 +142,14 @@ describe("detectStacks", () => {
     expect(flattenForest(forest, isStacked).map((n) => n.pr.id)).toEqual([1, 2]);
   });
 });
+
+import { stackRows } from "../src/core/stack/render";
+
+describe("stackRows", () => {
+  it("draws a branching stack as a tree", () => {
+    const m = { 1: ["a"], 2: ["a", "b"], 3: ["a", "b", "c"], 4: ["a", "d"] };
+    const prs = Object.entries(m).map(([id, c]) => pr(Number(id), { headSha: c[c.length - 1] }));
+    const forest = detectStacks(prs, { commitsByPr: commits(m) });
+    expect(stackRows(forest, 1).map((r) => `${r.prefix}${r.node.pr.id}`)).toEqual(["1", "├─ 2", "│  └─ 3", "└─ 4"]);
+  });
+});
