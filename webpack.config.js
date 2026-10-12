@@ -9,6 +9,8 @@ const entries = {
 
 module.exports = (env, argv) => {
   const dev = argv.mode === "development";
+  // The visual harness (mock data, no Azure DevOps) is only built on request: webpack --env harness
+  if (env && env.harness) entries.harness = "./src/harness/index.tsx";
   return {
     entry: entries,
     output: {

@@ -152,7 +152,7 @@ export function StackList() {
                     </td>
                     <td>
                       <HealthPill health={node.health} conflicts={node.hasConflicts} />
-                      {node.childIds.length > 0 && <span className="sp-pill muted" title="Pull requests stacked on this one">+{node.childIds.length}</span>}
+                      {node.childIds.length > 0 && <span className="sp-pill muted" title="Pull requests stacked on this one">{node.childIds.length} stacked</span>}
                     </td>
                     <td>
                       <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>

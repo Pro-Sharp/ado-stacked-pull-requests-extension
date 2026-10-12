@@ -23,12 +23,19 @@ interface Props {
   /** Rendered inside the native PR page (Stack tab): hides the back link. */
   embedded?: boolean;
   initialTab?: PrTab;
+  /** Called when the user switches tabs so the host can reflect it in the URL. */
+  onTabChange?: (tab: PrTab) => void;
 }
 
-export function PullRequestView({ repoId, prId, embedded, initialTab = "overview" }: Props) {
+export function PullRequestView({ repoId, prId, embedded, initialTab = "overview", onTabChange }: Props) {
   const service = useService();
   const nav = useNav();
-  const [tab, setTab] = React.useState<PrTab>(initialTab);
+  const [tab, setTabState] = React.useState<PrTab>(initialTab);
+  React.useEffect(() => setTabState(initialTab), [initialTab]);
+  const setTab = (t: PrTab) => {
+    setTabState(t);
+    onTabChange?.(t);
+  };
   const [mode, setMode] = React.useState<DiffMode | undefined>();
   const [completing, setCompleting] = React.useState(false);
   const [actionError, setActionError] = React.useState<unknown>();

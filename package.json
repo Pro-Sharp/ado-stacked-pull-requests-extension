@@ -16,7 +16,6 @@
   "dependencies": {
     "azure-devops-extension-api": "^5.279.1",
     "azure-devops-extension-sdk": "^4.2.0",
-    "azure-devops-ui": "^2.280.0",
     "diff": "^9.0.0",
     "dompurify": "^3.4.0",
     "marked": "^18.1.1",
@@ -30,6 +29,7 @@
     "copy-webpack-plugin": "^13.0.0",
     "css-loader": "^7.1.2",
     "html-webpack-plugin": "^5.6.3",
+    "jsdom": "^29.1.1",
     "sass": "^1.90.0",
     "sass-loader": "^16.0.5",
     "style-loader": "^4.0.0",
