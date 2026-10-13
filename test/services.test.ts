@@ -159,8 +159,9 @@ describe("layer diff", () => {
       ["/new.ts", undefined, "o1"]
     ]);
     const [, , , , , base, target] = fake.getCommitDiffs.mock.calls[0];
-    expect(base).toMatchObject({ baseVersion: "base1" });
-    expect(target).toMatchObject({ targetVersion: "childTip" });
+    // These are the fields the generated client turns into the baseVersion/targetVersion query parameters.
+    expect(base).toEqual({ version: "base1", versionType: 2 });
+    expect(target).toEqual({ version: "childTip", versionType: 2 });
   });
 
   it("fails clearly when there is no merge base", async () => {

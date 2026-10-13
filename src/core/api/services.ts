@@ -261,8 +261,10 @@ export class StackedPrService {
           false,
           top,
           skip,
-          { baseVersion: baseSha, baseVersionType: GitVersionType.Commit } as never,
-          { targetVersion: headSha, targetVersionType: GitVersionType.Commit } as never
+          // The generated client reads `version` / `versionType` from both descriptors (not `baseVersion` / `targetVersion`);
+          // with any other shape the query carries no versions and the server returns an empty diff.
+          { version: baseSha, versionType: GitVersionType.Commit } as never,
+          { version: headSha, versionType: GitVersionType.Commit } as never
         )
       );
       const page: LayerFile[] = [];

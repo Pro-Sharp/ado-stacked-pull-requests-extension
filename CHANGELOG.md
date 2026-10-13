@@ -1,6 +1,12 @@
 # Changelog
 
-## 0.1.0 - unreleased
+## 0.1.1
+
+- Fixed: the "This PR only" layer diff showed 0 changed files for stacked PRs (the commit-diff request was sent without its base and target commits)
+- Fixed: diff colours in a light Azure DevOps theme on a dark OS (the palette now follows the host theme instead of the OS setting)
+- Added a gap between the chips in the Stack column
+
+## 0.1.0
 
 Initial implementation.
 
