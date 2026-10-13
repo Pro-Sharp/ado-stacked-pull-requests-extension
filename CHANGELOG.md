@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.3.0
 
 - The hub, the Stack tab and the "Open stacked review" action are now behind a native Azure DevOps preview feature,
   *Stacked Pull Requests*, which is on by default and can be switched off per user or for the whole organization
