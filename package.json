@@ -1,6 +1,6 @@
 {
   "name": "ado-stacked-pullrequests",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Azure DevOps extension that shows stacked pull requests as a hierarchy and lets you review only the part each branch introduced.",
   "license": "MIT",
   "private": false,

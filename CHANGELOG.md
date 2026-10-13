@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2
+
+- Fixed: README screenshots did not show on the Marketplace page (the images are now packaged with the extension)
+
 ## 0.1.1
 
 - Fixed: the "This PR only" layer diff showed 0 changed files for stacked PRs (the commit-diff request was sent without its base and target commits)
