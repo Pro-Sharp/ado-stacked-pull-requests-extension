@@ -14,7 +14,8 @@ function Tab() {
   const repoId = cfg.repositoryId ?? cfg.pullRequest?.repository?.id;
   const ref = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
-    const resize = () => SDK.resize(undefined, Math.max(500, document.body.scrollHeight));
+    // Pass the current width explicitly: with `undefined` the SDK uses body.scrollWidth, which makes the iframe shrink on every resize.
+    const resize = () => SDK.resize(window.innerWidth, Math.max(500, document.body.scrollHeight));
     const observer = new ResizeObserver(resize);
     if (ref.current) observer.observe(ref.current);
     resize();

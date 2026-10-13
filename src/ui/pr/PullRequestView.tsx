@@ -109,8 +109,22 @@ export function PullRequestView({ repoId, prId, embedded, initialTab = "overview
   const raw: GitPullRequest = d.raw;
   const nativeUrl = nav.nativeUrl(pr.repositoryName, pr.id);
 
+  // Headless: inside the native PR page only the Files content is shown, the page already has the header and tabs.
+  if (embedded) {
+    return (
+      <div className="sp-app embedded">
+        <ErrorBanner error={actionError} />
+        {stack.loading && mode === undefined ? (
+          <Spinner text="Detecting the stack to pick the default diff..." />
+        ) : (
+          <FilesView pr={pr} parent={parent} iterations={d.iterations} threads={d.threads} mode={activeMode} onModeChange={setMode} onChanged={reload} nativeFilesUrl={`${nativeUrl}?_a=files`} />
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div className="sp-app" style={embedded ? { padding: "8px 0" } : undefined}>
+    <div className="sp-app">
       {!embedded && (
         <div style={{ marginBottom: 8 }}>
           <a onClick={() => nav.openList()} style={{ cursor: "pointer", fontSize: 12 }}>← All stacked pull requests</a>

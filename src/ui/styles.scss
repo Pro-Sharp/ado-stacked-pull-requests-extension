@@ -78,6 +78,10 @@ button {
 .sp-app {
   padding: 16px 20px 40px;
   min-width: 720px;
+  &.embedded {
+    min-width: 0;
+    padding: 0;
+  }
 }
 
 // ---- generic controls -------------------------------------------------------------------

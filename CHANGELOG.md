@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4
+
+- Fixed: the Stack tab on the native pull request page got narrower while loading (the iframe resize now keeps its width)
+- The Stack tab now shows only the Files view, without the duplicated header, tabs and stack map
+
 ## 0.1.3
 
 - Rewrote the README as a showcase page for the Marketplace and GitHub
