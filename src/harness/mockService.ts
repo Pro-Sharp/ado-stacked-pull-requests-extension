@@ -6,9 +6,9 @@ import { toPrInfo, RawPullRequest } from "../core/api/mapping";
  * In-memory stand-in for StackedPrService used by the visual harness and by
  * screenshots in the docs. It models a three-PR stack plus unrelated PRs in two repositories.
  */
-const me = { id: "me", displayName: "Ádám Kovács", imageUrl: "" };
-const bc = { id: "bc", displayName: "Balázs Csiaki", imageUrl: "" };
-const zn = { id: "zn", displayName: "Zsolt Nagy", imageUrl: "" };
+const me = { id: "me", displayName: "Alex Morgan", imageUrl: "" };
+const bc = { id: "bc", displayName: "Blake Carter", imageUrl: "" };
+const zn = { id: "zn", displayName: "Zoe Nolan", imageUrl: "" };
 
 const iso = (d: string) => new Date(d);
 
@@ -30,13 +30,13 @@ interface MockPr {
   labels: { id: string; name: string }[];
 }
 
-const repo = { id: "repo-hub", name: "hubscience-systematic-review" };
-const repo2 = { id: "repo-api", name: "hubscience-api" };
+const repo = { id: "repo-hub", name: "acme-research-portal" };
+const repo2 = { id: "repo-api", name: "acme-api" };
 
 const prs: MockPr[] = [
   {
     pullRequestId: 10870, repository: repo, title: "Storage path scope compose", isDraft: false, status: 1,
-    sourceRefName: "refs/heads/feature/61966-storage-path-scope-compose", targetRefName: "refs/heads/master",
+    sourceRefName: "refs/heads/feature/1234-storage-path-scope-compose", targetRefName: "refs/heads/master",
     lastMergeSourceCommit: { commitId: "a1a1a1a1a1a1" }, lastMergeTargetCommit: { commitId: "0000aaaa0000" }, mergeStatus: 3,
     createdBy: zn, creationDate: iso("2026-10-01T09:00:00Z"), description: "Introduces the **storage scope** composition used by the search engine.",
     reviewers: [{ id: "me", displayName: me.displayName, imageUrl: "", vote: 0, isRequired: true }, { id: "bc", displayName: bc.displayName, imageUrl: "", vote: 10 }], labels: [{ id: "l1", name: "backend" }]
@@ -49,11 +49,11 @@ const prs: MockPr[] = [
     reviewers: [{ id: "me", displayName: me.displayName, imageUrl: "", vote: 5 }, { id: "zn", displayName: zn.displayName, imageUrl: "", vote: 0 }], labels: []
   },
   {
-    pullRequestId: 10872, repository: repo, title: "Research: how the field builds search strategies, and what that means for ours", isDraft: true, status: 1,
+    pullRequestId: 10872, repository: repo, title: "Research: how other tools build search strategies, and what that means for ours", isDraft: true, status: 1,
     sourceRefName: "refs/heads/chore/search-strategy-research", targetRefName: "refs/heads/master",
     lastMergeSourceCommit: { commitId: "c3c3c3c3c3c3" }, lastMergeTargetCommit: { commitId: "0000aaaa0000" }, mergeStatus: 3,
     createdBy: bc, creationDate: iso("2026-09-19T08:35:00Z"),
-    description: "## Summary\n\nDocumentation only. Research into how other systematic review systems get from a research question to a set of ready-made search expressions.\n\n- `docs/RESEARCH-search-strategy-construction.md` is the decision document.\n- `docs/research/` carries the four evidence documents.\n\n**Findings that change what we can build:**\n\n- Cochrane publishes nine strings, all study-design filters.\n- The paediatric filters span 58.5% to 99.5% sensitivity.",
+    description: "## Summary\n\nDocumentation only. Research into how comparable products get from a user question to a set of ready-made search expressions.\n\n- `docs/RESEARCH-search-strategy-construction.md` is the decision document.\n- `docs/research/` carries the four supporting documents.\n\n**Findings that change what we can build:**\n\n- Most products publish a handful of strings, all generic filters.\n- Published filters vary widely in how much they catch.",
     reviewers: [], labels: []
   },
   {
@@ -98,8 +98,8 @@ const FILES: Record<string, Record<string, string>> = {
     "/docs/ROADMAP.md": "# Roadmap\n\n- Search (rework)\n- Screening\n- Export\n",
     "/src/storage.ts": "export const scope = 'project';\nexport function path(id: string) {\n  return `/data/${scope}/${id}`;\n}\nexport function compose(...parts: string[]) {\n  return parts.join('/');\n}\n",
     "/src/translator.ts": "export class FrameworkQueryTranslator {\n  translate(q: string) {\n    return q.trim();\n  }\n}\n",
-    "/docs/RESEARCH-search-strategy-construction.md": "# Search strategy construction\n\nThis document answers three questions.\n\n1. How do Rayyan and EasySLR build search?\n2. What solutions exist?\n3. Do Cochrane publish ready-made strings?\n",
-    "/docs/research/search-filter-catalogue.md": "# A Catalogue of Reusable Search Filters\n\n**Answering: are there ready-made search expressions?**\n\nShort answer: yes for study design.\n"
+    "/docs/RESEARCH-search-strategy-construction.md": "# Search strategy construction\n\nThis document answers three questions.\n\n1. How do other tools build search?\n2. What solutions exist?\n3. Do vendors publish ready-made strings?\n",
+    "/docs/research/search-filter-catalogue.md": "# A Catalogue of Reusable Search Filters\n\n**Answering: are there ready-made search expressions?**\n\nShort answer: yes for generic filters.\n"
   }
 };
 
@@ -125,9 +125,9 @@ const threads: Record<number, ThreadLike[]> = {
 
 const iterations: Record<number, unknown[]> = {
   10872: [
-    { id: 1, author: bc, createdDate: iso("2026-09-19T08:35:00Z"), commits: [{ commitId: "c3c3c3c3c3c3", comment: "How the field builds search strategies, and what that means for ours", author: { name: "Balázs Csiaki", date: iso("2026-09-19T08:35:00Z") } }], sourceRefCommit: { commitId: "c3c3c3c3c3c3" }, commonRefCommit: { commitId: "base" }, newTargetRefName: "refs/heads/master", oldTargetRefName: "refs/heads/master" },
-    { id: 2, author: zn, createdDate: iso("2026-10-05T10:00:00Z"), commits: [], sourceRefCommit: { commitId: "c3c3c3c3c3c3" }, commonRefCommit: { commitId: "base" }, newTargetRefName: "refs/heads/feature/61966-storage-path-scope-compose", oldTargetRefName: "refs/heads/master" },
-    { id: 3, author: zn, createdDate: iso("2026-10-05T10:05:00Z"), commits: [], sourceRefCommit: { commitId: "c3c3c3c3c3c3" }, commonRefCommit: { commitId: "base" }, newTargetRefName: "refs/heads/master", oldTargetRefName: "refs/heads/feature/61966-storage-path-scope-compose" }
+    { id: 1, author: bc, createdDate: iso("2026-09-19T08:35:00Z"), commits: [{ commitId: "c3c3c3c3c3c3", comment: "How other tools build search strategies, and what that means for ours", author: { name: "Blake Carter", date: iso("2026-09-19T08:35:00Z") } }], sourceRefCommit: { commitId: "c3c3c3c3c3c3" }, commonRefCommit: { commitId: "base" }, newTargetRefName: "refs/heads/master", oldTargetRefName: "refs/heads/master" },
+    { id: 2, author: zn, createdDate: iso("2026-10-05T10:00:00Z"), commits: [], sourceRefCommit: { commitId: "c3c3c3c3c3c3" }, commonRefCommit: { commitId: "base" }, newTargetRefName: "refs/heads/feature/1234-storage-path-scope-compose", oldTargetRefName: "refs/heads/master" },
+    { id: 3, author: zn, createdDate: iso("2026-10-05T10:05:00Z"), commits: [], sourceRefCommit: { commitId: "c3c3c3c3c3c3" }, commonRefCommit: { commitId: "base" }, newTargetRefName: "refs/heads/master", oldTargetRefName: "refs/heads/feature/1234-storage-path-scope-compose" }
   ]
 };
 
@@ -161,7 +161,7 @@ export function createMockService(): StackedPrService {
   const noop = () => delay(undefined as never);
 
   const mock = {
-    ctx: { projectId: "p", projectName: "HubScience", userId: "me", userName: me.displayName },
+    ctx: { projectId: "p", projectName: "Contoso", userId: "me", userName: me.displayName },
     loadStacks: () => delay(snapshot),
     getPullRequest: (_r: string, id: number) => delay(rawFor(prs.find((p) => p.pullRequestId === id)!) as never),
     getIterations: (_r: string, id: number) => delay((iterations[id] ?? defaultIteration(prs.find((p) => p.pullRequestId === id)!)) as never),
@@ -170,7 +170,7 @@ export function createMockService(): StackedPrService {
     getThreads: (_r: string, id: number) => delay((threads[id] ?? []) as never),
     getStatuses: () => delay([] as never),
     getPolicyEvaluations: () => delay([{ evaluationId: "e1", status: 2, configuration: { type: { displayName: "Minimum number of reviewers" } }, context: {} }, { evaluationId: "e2", status: 1, configuration: { type: { displayName: "Build" } }, context: { buildDefinitionName: "CI" } }] as never),
-    getWorkItemRefs: () => delay([{ id: "61966" }] as never),
+    getWorkItemRefs: () => delay([{ id: "1234" }] as never),
     getNativeChanges: (pr: { headSha: string }) => delay(filesBetween("base", pr.headSha) as never),
     getLayerRange: (child: { headSha: string }, parent: { headSha: string }) => delay({ baseSha: parent.headSha, headSha: child.headSha, files: filesBetween(parent.headSha, child.headSha) } as never),
     getFileText: (_r: string, path: string, sha: string) => delay((FILES[sha] ?? {})[path] ?? ""),

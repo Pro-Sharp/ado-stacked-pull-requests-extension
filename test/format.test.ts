@@ -5,7 +5,7 @@ describe("format helpers", () => {
   const now = new Date("2026-10-12T12:00:00Z");
 
   it("builds initials", () => {
-    expect(initials("Balázs Csiaki")).toBe("BC");
+    expect(initials("Blake Carter")).toBe("BC");
     expect(initials("Cher")).toBe("CH");
     expect(initials(undefined)).toBe("?");
   });

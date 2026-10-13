@@ -35,7 +35,7 @@ describe("common components", () => {
   });
 
   it("falls back to initials without an avatar url", () => {
-    expect(renderToStaticMarkup(<Avatar name="Zsolt Nagy" />)).toContain("ZN");
+    expect(renderToStaticMarkup(<Avatar name="Zoe Nolan" />)).toContain("ZN");
   });
 });
 
