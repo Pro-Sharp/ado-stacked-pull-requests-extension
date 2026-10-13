@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { AsyncCache, mapLimit, withRetry } from "../src/core/api/concurrency";
+import { AsyncCache, mapLimit, pagedFetch, withRetry } from "../src/core/api/concurrency";
 import { reviewSummary, shortRef, toPrInfo, voteKind, voteLabel } from "../src/core/api/mapping";
 import { buildDiffRows } from "../src/core/diff/lineDiff";
 import { bucketThreads, countResolved, isResolved, isSystemThread, placeThreads } from "../src/core/diff/threads";
@@ -64,6 +64,24 @@ describe("concurrency helpers", () => {
     });
     expect(out).toEqual([2, 4, 6, 8, 10, 12]);
     expect(peak).toBeLessThanOrEqual(2);
+  });
+
+  it("pagedFetch reports each page as it arrives and stops on a short page", async () => {
+    const pages = [[1, 2], [3, 4], [5]];
+    const fetchPage = vi.fn(async (skip: number) => pages[skip / 2]);
+    const seen: number[][] = [];
+    const all = await pagedFetch(fetchPage, 2, (page) => seen.push(page));
+    expect(all).toEqual([1, 2, 3, 4, 5]);
+    expect(seen).toEqual(pages);
+    expect(fetchPage.mock.calls.map((c) => c[0])).toEqual([0, 2, 4]);
+  });
+
+  it("pagedFetch stops requesting once cancelled", async () => {
+    let calls = 0;
+    const fetchPage = async () => (calls++, [1, 2]);
+    const all = await pagedFetch(fetchPage, 2, undefined, () => calls >= 2);
+    expect(calls).toBe(2);
+    expect(all).toHaveLength(4);
   });
 
   it("AsyncCache de-duplicates and forgets failures", async () => {

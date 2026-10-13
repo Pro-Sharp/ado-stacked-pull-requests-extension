@@ -4,6 +4,7 @@ import {
   Comment,
   CommentThreadStatus,
   GitChange,
+  GitCommitRef,
   GitPullRequest,
   GitPullRequestCommentThread,
   GitPullRequestIteration,
@@ -16,7 +17,7 @@ import {
   PullRequestTimeRangeType
 } from "azure-devops-extension-api/Git";
 import { PolicyEvaluationRecord, PolicyRestClient } from "azure-devops-extension-api/Policy";
-import { AsyncCache, mapLimit, withRetry } from "./concurrency";
+import { AsyncCache, mapLimit, pagedFetch, withRetry } from "./concurrency";
 import { RawPullRequest, toPrInfo } from "./mapping";
 import { detectStacks } from "../stack/detect";
 import { PrInfo, StackForest } from "../stack/types";
@@ -37,6 +38,13 @@ export interface LoadOptions {
   /** Also pull PRs completed within this many days so merged parents can anchor their children. */
   completedDays?: number;
   onProgress?: (done: number, total: number) => void;
+  /**
+   * Called with a provisional snapshot each time more data arrives (a page of pull requests, a batch of commit lookups),
+   * so the UI can render rows while the rest is still loading. The returned snapshot is the final one.
+   */
+  onPartial?: (snapshot: StackSnapshot) => void;
+  /** Polled between requests; return true to stop issuing further requests (the caller discards the result). */
+  cancelled?: () => boolean;
 }
 
 export interface StackSnapshot {
@@ -92,11 +100,15 @@ export class StackedPrService {
     return repos.filter((r) => !r.isDisabled).sort((a, b) => a.name.localeCompare(b.name));
   }
 
-  private async fetchByStatus(status: PullRequestStatus, repoId: string | undefined, since?: Date): Promise<GitPullRequest[]> {
-    const out: GitPullRequest[] = [];
-    const pageSize = 100;
-    for (let skip = 0; ; skip += pageSize) {
-      const page = await withRetry(() =>
+  private fetchByStatus(
+    status: PullRequestStatus,
+    repoId: string | undefined,
+    since?: Date,
+    onPage?: (page: GitPullRequest[]) => void,
+    cancelled?: () => boolean
+  ): Promise<GitPullRequest[]> {
+    return pagedFetch(
+      (skip, top) =>
         this.git.getPullRequestsByProject(
           this.ctx.projectName,
           {
@@ -107,30 +119,59 @@ export class StackedPrService {
           } as never,
           undefined,
           skip,
-          pageSize
-        )
-      );
-      out.push(...page);
-      if (page.length < pageSize) break;
-    }
-    return out;
+          top
+        ),
+      100,
+      (page) => onPage?.(page),
+      cancelled
+    );
   }
 
   async loadStacks(options: LoadOptions = {}): Promise<StackSnapshot> {
-    const repos = await this.listRepositories();
+    const cancelled = () => options.cancelled?.() ?? false;
     const repoIds = options.repositoryIds?.length ? options.repositoryIds : [undefined];
 
-    const rawList: GitPullRequest[] = [];
+    // The repository list is only needed for the picker, so it loads alongside the pull request pages.
+    let repositories: GitRepository[] = [];
+    const reposLoaded = this.listRepositories().then((r) => (repositories = r));
+
+    const raw = new Map<number, GitPullRequest>();
+    const commitsByPr = new Map<number, Set<string>>();
+    let manualParents = new Map<number, number>();
+    let prs: PrInfo[] = [];
+    const snapshot = (): StackSnapshot => ({ forest: detectStacks(prs, { commitsByPr, manualParents }), prs, raw, repositories });
+
+    let lastEmit = 0;
+    const emit = (force = false) => {
+      if (!options.onPartial || cancelled()) return;
+      const now = Date.now();
+      if (!force && now - lastEmit < 150) return;
+      lastEmit = now;
+      options.onPartial(snapshot());
+    };
+
+    const sources: { status: PullRequestStatus; repoId?: string; since?: Date }[] = [];
     for (const repoId of repoIds) {
-      rawList.push(...(await this.fetchByStatus(PullRequestStatus.Active, repoId)));
+      sources.push({ status: PullRequestStatus.Active, repoId });
       if (options.completedDays) {
-        const since = new Date(Date.now() - options.completedDays * 86_400_000);
-        rawList.push(...(await this.fetchByStatus(PullRequestStatus.Completed, repoId, since)));
+        sources.push({ status: PullRequestStatus.Completed, repoId, since: new Date(Date.now() - options.completedDays * 86_400_000) });
       }
     }
-
-    const raw = new Map(rawList.map((p) => [p.pullRequestId, p]));
-    const prs = rawList.map((p) => toPrInfo(p as unknown as RawPullRequest));
+    // Every source is paged independently and in parallel; rows are shown as each page lands.
+    await mapLimit(sources, 3, (src) =>
+      this.fetchByStatus(
+        src.status,
+        src.repoId,
+        src.since,
+        (page) => {
+          for (const p of page) raw.set(p.pullRequestId, p);
+          prs = [...raw.values()].map((p) => toPrInfo(p as unknown as RawPullRequest));
+          emit();
+        },
+        cancelled
+      )
+    );
+    emit(true);
 
     // Only PRs sharing repo+target with another PR can be "contained" stacks; others need no commit lookup.
     const groups = new Map<string, PrInfo[]>();
@@ -141,29 +182,40 @@ export class StackedPrService {
     const needCommits = [...groups.values()].filter((g) => g.length > 1).flat();
 
     let done = 0;
-    const commitsByPr = new Map<number, Set<string>>();
-    await mapLimit(needCommits, 4, async (p) => {
-      try {
-        commitsByPr.set(p.id, await this.getPrCommitIds(p));
-      } finally {
-        options.onProgress?.(++done, needCommits.length);
-      }
-    });
+    options.onProgress?.(0, needCommits.length);
+    await Promise.all([
+      mapLimit(needCommits, 4, async (p) => {
+        if (cancelled()) return;
+        try {
+          commitsByPr.set(p.id, await this.getPrCommitIds(p));
+        } catch {
+          /* a PR whose commits cannot be read stays a root; the rest of the list must still render */
+        } finally {
+          options.onProgress?.(++done, needCommits.length);
+          emit();
+        }
+      }),
+      this.loadManualParents(prs.filter((p) => p.status === "active"), cancelled).then((m) => {
+        manualParents = m;
+        emit();
+      })
+    ]);
 
-    const manualParents = await this.loadManualParents(prs.filter((p) => p.status === "active"));
-    return { forest: detectStacks(prs, { commitsByPr, manualParents }), prs, raw, repositories: repos };
+    await reposLoaded;
+    return snapshot();
   }
 
   getPrCommitIds(pr: PrInfo): Promise<Set<string>> {
     return this.commitCache.get(`${pr.repositoryId}:${pr.id}:${pr.headSha}`, async () => {
-      const commits = await withRetry(() => this.git.getPullRequestCommits(pr.repositoryId, pr.id, this.ctx.projectName));
+      const commits = await this.getCommits(pr.repositoryId, pr.id);
       return new Set(commits.map((c) => c.commitId));
     });
   }
 
-  private async loadManualParents(prs: PrInfo[]): Promise<Map<number, number>> {
+  private async loadManualParents(prs: PrInfo[], cancelled?: () => boolean): Promise<Map<number, number>> {
     const result = new Map<number, number>();
     await mapLimit(prs, 6, async (p) => {
+      if (cancelled?.()) return;
       try {
         const props = await this.git.getPullRequestProperties(p.repositoryId, p.id, this.ctx.projectName);
         const value = props?.value?.[PARENT_PROPERTY]?.$value ?? props?.[PARENT_PROPERTY]?.$value;
@@ -197,8 +249,8 @@ export class StackedPrService {
     });
   }
 
-  /** Files changed by `head` relative to `base`, with paging. */
-  async diffCommits(repoId: string, baseSha: string, headSha: string): Promise<LayerFile[]> {
+  /** Files changed by `head` relative to `base`, with paging. `onPage` receives each page's files as it arrives. */
+  async diffCommits(repoId: string, baseSha: string, headSha: string, onPage?: (files: LayerFile[]) => void): Promise<LayerFile[]> {
     const files: LayerFile[] = [];
     const top = 1000;
     for (let skip = 0; ; skip += top) {
@@ -213,33 +265,44 @@ export class StackedPrService {
           { targetVersion: headSha, targetVersionType: GitVersionType.Commit } as never
         )
       );
+      const page: LayerFile[] = [];
       for (const c of diff.changes ?? []) {
         if (c.item?.isFolder) continue;
-        files.push(toLayerFile(c));
+        page.push(toLayerFile(c));
       }
+      files.push(...page);
+      onPage?.(page);
       if (diff.allChangesIncluded || !(diff.changes?.length >= top)) break;
     }
     return files.sort((a, b) => a.path.localeCompare(b.path));
   }
 
-  async getLayerRange(child: PrInfo, parent: PrInfo): Promise<LayerRange> {
+  async getLayerRange(child: PrInfo, parent: PrInfo, onFiles?: (baseSha: string, files: LayerFile[]) => void): Promise<LayerRange> {
     const baseSha = await this.getMergeBase(child.repositoryId, parent.headSha, child.headSha);
-    const files = await this.diffCommits(child.repositoryId, baseSha, child.headSha);
+    const files = await this.diffCommits(child.repositoryId, baseSha, child.headSha, onFiles && ((page) => onFiles(baseSha, page)));
     return { baseSha, headSha: child.headSha, files };
   }
 
-  /** Files for the native "all changes" view: latest iteration against the PR's merge base. */
-  async getNativeChanges(pr: PrInfo, iterationId: number, compareTo = 0): Promise<(LayerFile & { changeTrackingId: number })[]> {
+  /** Files for the native "all changes" view: latest iteration against the PR's merge base. `onPage` streams each page. */
+  async getNativeChanges(
+    pr: PrInfo,
+    iterationId: number,
+    compareTo = 0,
+    onPage?: (files: (LayerFile & { changeTrackingId: number })[]) => void
+  ): Promise<(LayerFile & { changeTrackingId: number })[]> {
     const out: (LayerFile & { changeTrackingId: number })[] = [];
     let skip = 0;
     while (true) {
       const page = await withRetry(() =>
-        this.git.getPullRequestIterationChanges(pr.repositoryId, pr.id, iterationId, this.ctx.projectName, 2000, skip, compareTo)
+        this.git.getPullRequestIterationChanges(pr.repositoryId, pr.id, iterationId, this.ctx.projectName, 500, skip, compareTo)
       );
+      const batch: (LayerFile & { changeTrackingId: number })[] = [];
       for (const c of page.changeEntries ?? []) {
         if (c.item?.isFolder) continue;
-        out.push({ ...toLayerFile(c), changeTrackingId: c.changeTrackingId });
+        batch.push({ ...toLayerFile(c), changeTrackingId: c.changeTrackingId });
       }
+      out.push(...batch);
+      onPage?.(batch);
       if (!page.nextSkip) break;
       skip = page.nextSkip;
     }
@@ -281,12 +344,37 @@ export class StackedPrService {
     return this.git.getPullRequestIterations(repoId, id, this.ctx.projectName);
   }
 
-  getIterationCommits(repoId: string, id: number, iterationId: number) {
-    return this.git.getPullRequestIterationCommits(repoId, id, iterationId, this.ctx.projectName);
+  getIterationCommits(repoId: string, id: number, iterationId: number, onPage?: (page: GitCommitRef[], all: GitCommitRef[]) => void): Promise<GitCommitRef[]> {
+    return pagedFetch((skip, top) => this.git.getPullRequestIterationCommits(repoId, id, iterationId, this.ctx.projectName, top, skip), 500, onPage);
   }
 
-  async getCommits(repoId: string, id: number) {
-    return this.git.getPullRequestCommits(repoId, id, this.ctx.projectName);
+  /**
+   * All commits of the PR. The endpoint pages through the `x-ms-continuationtoken` header, which the generated client
+   * does not follow, so the remaining pages are read here. `onPage` fires per page so lists can render early.
+   */
+  async getCommits(repoId: string, id: number, onPage?: (page: GitCommitRef[], all: GitCommitRef[]) => void): Promise<GitCommitRef[]> {
+    const first = await withRetry(() => this.git.getPullRequestCommits(repoId, id, this.ctx.projectName));
+    const all: GitCommitRef[] = [...first];
+    onPage?.([...first], all);
+    let token = first.continuationToken;
+    while (token) {
+      const current = token;
+      const next = await withRetry(() => this.fetchCommitsPage(repoId, id, current));
+      all.push(...next.value);
+      onPage?.(next.value, all);
+      token = next.continuationToken;
+    }
+    return all;
+  }
+
+  private async fetchCommitsPage(repoId: string, id: number, continuationToken: string): Promise<{ value: GitCommitRef[]; continuationToken: string | null }> {
+    const accessToken = await SDK.getAccessToken();
+    const org = SDK.getHost().name;
+    const url = `https://dev.azure.com/${org}/${encodeURIComponent(this.ctx.projectName)}/_apis/git/repositories/${repoId}/pullRequests/${id}/commits?api-version=7.1&continuationToken=${encodeURIComponent(continuationToken)}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!res.ok) throw Object.assign(new Error(`Loading commits failed (${res.status})`), { status: res.status });
+    const body = await res.json();
+    return { value: (body.value ?? []) as GitCommitRef[], continuationToken: res.headers.get("x-ms-continuationtoken") };
   }
 
   getThreads(repoId: string, id: number, iteration?: number): Promise<GitPullRequestCommentThread[]> {

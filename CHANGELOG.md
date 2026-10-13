@@ -12,3 +12,4 @@ Initial implementation.
 - Votes (all five states), reviewers, tags, work items, policy evaluations and statuses, complete / auto-complete / abandon / publish
 - Retarget and merge-order status helpers for stacks
 - Hub page, PR tab and PR menu action contributions
+- Progressive loading: pull request pages, changed-file pages and commit pages render as they arrive, long lists (stack list, files, diff lines, activity, updates, commits) use infinite scroll, and the PR view no longer waits for stack detection

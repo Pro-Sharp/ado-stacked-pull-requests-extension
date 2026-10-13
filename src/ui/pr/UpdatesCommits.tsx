@@ -1,7 +1,8 @@
 import * as React from "react";
 import { GitCommitRef, GitPullRequestIteration } from "azure-devops-extension-api/Git";
 import { shortRef } from "../../core/api/mapping";
-import { Avatar, ErrorBanner, Spinner, useAsync } from "../common/components";
+import { Avatar, ErrorBanner, MoreSentinel, Spinner, useIncremental } from "../common/components";
+import { mapLimit } from "../../core/api/concurrency";
 import { dateTime, shortDate, shortSha } from "../common/format";
 import { useService } from "../context";
 import { PrInfo } from "../../core/stack/types";
@@ -24,28 +25,38 @@ function CommitLine({ c }: { c: GitCommitRef }) {
 /** Iterations ("updates") of the PR, newest first, like the native Updates tab. */
 export function UpdatesTab({ pr, iterations }: { pr: PrInfo; iterations: GitPullRequestIteration[] }) {
   const service = useService();
-  const withCommits = useAsync(
-    async () => {
-      const out = new Map<number, GitCommitRef[]>();
-      for (const it of iterations) {
-        try {
-          const detail = await service.getIterationCommits(pr.repositoryId, pr.id, it.id);
-          out.set(it.id, detail);
-        } catch {
-          out.set(it.id, it.commits ?? []);
-        }
+  // Iterations render at once from the data already in hand; their commit lists load lazily, only for the
+  // iterations that are on screen (newest first, more on scroll), a few requests at a time.
+  const ordered = React.useMemo(() => [...iterations].reverse(), [iterations]);
+  const paging = useIncremental(ordered.length, 15, pr.id);
+  const [commitsByIteration, setCommits] = React.useState(new Map<number, GitCommitRef[]>());
+  const [error, setError] = React.useState<unknown>();
+  const requested = React.useRef(new Set<string>());
+  const visibleIds = ordered.slice(0, paging.limit).map((it) => it.id).join(",");
+  React.useEffect(() => {
+    let alive = true;
+    const todo = ordered.slice(0, paging.limit).filter((it) => !requested.current.has(`${pr.id}:${it.id}`));
+    todo.forEach((it) => requested.current.add(`${pr.id}:${it.id}`));
+    mapLimit(todo, 4, async (it) => {
+      try {
+        const detail = await service.getIterationCommits(pr.repositoryId, pr.id, it.id);
+        if (alive) setCommits((m) => new Map(m).set(it.id, detail));
+      } catch {
+        if (alive) setCommits((m) => new Map(m).set(it.id, it.commits ?? []));
       }
-      return out;
-    },
-    [pr.id, iterations.length]
-  );
+    }).catch((e) => alive && setError(e));
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pr.id, visibleIds]);
   const first = iterations[0];
   return (
     <div className="sp-timeline">
-      <ErrorBanner error={withCommits.error} />
-      {[...iterations].reverse().map((it) => {
+      <ErrorBanner error={error} />
+      {ordered.slice(0, paging.limit).map((it) => {
         const retarget = it.newTargetRefName && it.oldTargetRefName && it.newTargetRefName !== it.oldTargetRefName;
-        const commits = withCommits.data?.get(it.id) ?? [];
+        const commits = commitsByIteration.get(it.id) ?? it.commits ?? [];
         return (
           <div className="entry" key={it.id}>
             <span className="marker">{it.id}</span>
@@ -69,7 +80,8 @@ export function UpdatesTab({ pr, iterations }: { pr: PrInfo; iterations: GitPull
           </div>
         );
       })}
-      {first?.commonRefCommit && (
+      {paging.hasMore && <MoreSentinel onVisible={paging.more} version={paging.limit} label={`Showing ${paging.limit} of ${ordered.length} updates, scroll for more...`} />}
+      {!paging.hasMore && first?.commonRefCommit && (
         <div className="sp-muted" style={{ padding: "6px 0" }}>Based on commit <span style={{ fontFamily: "Consolas, monospace" }}>{shortSha(first.commonRefCommit.commitId)}</span></div>
       )}
     </div>
@@ -78,12 +90,30 @@ export function UpdatesTab({ pr, iterations }: { pr: PrInfo; iterations: GitPull
 
 export function CommitsTab({ pr }: { pr: PrInfo }) {
   const service = useService();
-  const commits = useAsync(() => service.getCommits(pr.repositoryId, pr.id), [pr.id, pr.headSha]);
-  if (commits.loading) return <Spinner />;
+  // Pages are appended as they arrive; the list is windowed so a PR with hundreds of commits stays responsive.
+  const [commits, setCommits] = React.useState<GitCommitRef[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<unknown>();
+  React.useEffect(() => {
+    let alive = true;
+    setCommits([]);
+    setLoading(true);
+    setError(undefined);
+    service
+      .getCommits(pr.repositoryId, pr.id, (_page, all) => alive && setCommits([...all]))
+      .then(
+        (all) => alive && (setCommits(all), setLoading(false)),
+        (e) => alive && (setError(e), setLoading(false))
+      );
+    return () => {
+      alive = false;
+    };
+  }, [pr.id, pr.headSha]);
+  const paging = useIncremental(commits.length, 50, pr.id);
   return (
     <div>
-      <ErrorBanner error={commits.error} />
-      {(commits.data ?? []).map((c) => (
+      <ErrorBanner error={error} />
+      {commits.slice(0, paging.limit).map((c) => (
         <div className="sp-card sp-commit" key={c.commitId}>
           <div className="msg">{(c.comment ?? "").split("\n")[0]}</div>
           <div className="sub">
@@ -94,7 +124,9 @@ export function CommitsTab({ pr }: { pr: PrInfo }) {
           </div>
         </div>
       ))}
-      {!commits.loading && !(commits.data ?? []).length && <div className="sp-muted">No commits.</div>}
+      {paging.hasMore && <MoreSentinel onVisible={paging.more} version={paging.limit} />}
+      {loading && <Spinner text={commits.length ? `Loaded ${commits.length} commits, loading more...` : "Loading..."} />}
+      {!loading && !commits.length && !error && <div className="sp-muted">No commits.</div>}
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { GitPullRequest } from "azure-devops-extension-api/Git";
 import { shortRef } from "../../core/api/mapping";
 import { StackSnapshot } from "../../core/api/services";
 import { stackCount, filterForest, ListTab, tabCounts } from "./filter";
-import { Avatar, ErrorBanner, HealthPill, Menu, Reviewers, Spinner, useAsync } from "../common/components";
+import { Avatar, ErrorBanner, HealthPill, Menu, MoreSentinel, Reviewers, Spinner, useAsync, useIncremental } from "../common/components";
 import { timeAgo } from "../common/format";
 import { useNav, useService } from "../context";
 import { mapLimit } from "../../core/api/concurrency";
@@ -52,17 +52,27 @@ export function StackList() {
       return next;
     });
 
+  // Rows are shown from provisional snapshots while pages and commit lookups are still arriving.
+  const [partial, setPartial] = React.useState<StackSnapshot>();
+  const generation = React.useRef(0);
   const snapshot = useAsync<StackSnapshot>(
-    () =>
-      service.loadStacks({
+    () => {
+      const mine = ++generation.current;
+      const current = () => mine === generation.current;
+      setPartial(undefined);
+      setProgress([0, 0]);
+      return service.loadStacks({
         repositoryIds: prefs.repositoryIds,
         completedDays: prefs.tab === "completed" && !prefs.completedDays ? 30 : prefs.completedDays,
-        onProgress: (d, t) => setProgress([d, t])
-      }),
+        onProgress: (d, t) => current() && setProgress([d, t]),
+        onPartial: (s) => current() && setPartial(s),
+        cancelled: () => !current()
+      });
+    },
     [prefs.repositoryIds.join(","), prefs.completedDays, prefs.tab === "completed"]
   );
 
-  const snap = snapshot.data;
+  const snap = snapshot.loading ? partial ?? snapshot.data : snapshot.data;
   const reviewersOf = React.useCallback(
     (id: number) => (snap?.raw.get(id)?.reviewers ?? []).map((r) => ({ id: r.id, vote: r.vote })),
     [snap]
@@ -71,7 +81,10 @@ export function StackList() {
   const rows = React.useMemo(() => (snap ? filterForest(snap.forest, { ...base, tab: prefs.tab }, reviewersOf) : []), [snap, search, prefs]);
   const counts = React.useMemo(() => (snap ? tabCounts(snap.forest, base, reviewersOf) : undefined), [snap, search, prefs.stackedOnly, prefs.repositoryIds]);
 
-  const resolved = useCommentCounts(rows.filter((r) => r.matched && r.node.pr.status === "active").map((r) => r.node.pr));
+  // Infinite scroll: only the first rows are rendered; more are added as the end of the table nears the viewport.
+  const paging = useIncremental(rows.length, 50, `${prefs.tab}|${search}|${prefs.stackedOnly}|${prefs.repositoryIds.join(",")}`);
+  const visibleRows = rows.slice(0, paging.limit);
+  const resolved = useCommentCounts(visibleRows.filter((r) => r.matched && r.node.pr.status === "active").map((r) => r.node.pr));
 
   return (
     <div className="sp-app">
@@ -102,9 +115,9 @@ export function StackList() {
       </div>
 
       <ErrorBanner error={snapshot.error} />
-      {snapshot.loading && <Spinner text={progress[1] ? `Detecting stacks (${progress[0]}/${progress[1]})...` : "Loading pull requests..."} />}
+      {snapshot.loading && <Spinner text={snap ? (progress[1] ? `Detecting stacks (${progress[0]}/${progress[1]})...` : `Loaded ${snap.prs.length} pull requests, loading more...`) : "Loading pull requests..."} />}
 
-      {!snapshot.loading && snap && (
+      {snap && (
         <div className="sp-card">
           <table className="sp-table">
             <thead>
@@ -119,14 +132,14 @@ export function StackList() {
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && (
+              {rows.length === 0 && !snapshot.loading && (
                 <tr>
                   <td colSpan={7} className="sp-muted" style={{ textAlign: "center", padding: 36 }}>
                     No pull requests match.
                   </td>
                 </tr>
               )}
-              {rows.map(({ node, matched }) => {
+              {visibleRows.map(({ node, matched }) => {
                 const raw = snap.raw.get(node.pr.id) as GitPullRequest | undefined;
                 const pr = node.pr;
                 const c = resolved.get(pr.id);
@@ -170,6 +183,7 @@ export function StackList() {
               })}
             </tbody>
           </table>
+          {paging.hasMore && <MoreSentinel onVisible={paging.more} version={paging.limit} />}
         </div>
       )}
     </div>
@@ -198,26 +212,26 @@ function RepoPicker({ snap, selected, onChange }: { snap?: StackSnapshot; select
   );
 }
 
-/** Lazily loads resolved/total comment counts for the visible PRs (bounded concurrency). */
+/** Lazily loads resolved/total comment counts for the rendered PRs (bounded concurrency, each PR requested once). */
 function useCommentCounts(prs: { id: number; repositoryId: string }[]): Map<number, { resolved: number; total: number }> {
   const service = useService();
   const [counts, setCounts] = React.useState(new Map<number, { resolved: number; total: number }>());
+  const requested = React.useRef(new Set<number>());
+  const mounted = React.useRef(true);
+  React.useEffect(() => () => void (mounted.current = false), []);
   const key = prs.map((p) => p.id).join(",");
   React.useEffect(() => {
-    let alive = true;
-    const todo = prs.filter((p) => !counts.has(p.id)).slice(0, 60);
+    const todo = prs.filter((p) => !requested.current.has(p.id));
     if (!todo.length) return;
+    todo.forEach((p) => requested.current.add(p.id));
     mapLimit(todo, 4, async (p) => {
       try {
         const threads = await service.getThreads(p.repositoryId, p.id);
-        if (alive) setCounts((m) => new Map(m).set(p.id, countResolved(threads as never)));
+        if (mounted.current) setCounts((m) => new Map(m).set(p.id, countResolved(threads as never)));
       } catch {
-        /* counts are best-effort */
+        requested.current.delete(p.id); // counts are best-effort; allow a later retry
       }
     });
-    return () => {
-      alive = false;
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
   return counts;

@@ -40,29 +40,47 @@ export function PullRequestView({ repoId, prId, embedded, initialTab = "overview
   const [completing, setCompleting] = React.useState(false);
   const [actionError, setActionError] = React.useState<unknown>();
 
-  const data = useAsync(async () => {
+  // Three independent loads so the page renders as soon as the PR itself is here:
+  //  - core: the PR, its iterations and comment threads (everything the tabs need),
+  //  - checks: statuses, policies and linked work items (the Overview side cards),
+  //  - stack: the repository-wide stack detection, by far the heaviest request and only needed for the stack map.
+  const core = useAsync(async () => {
     const [raw, iterations] = await Promise.all([service.getPullRequest(repoId, prId), service.getIterations(repoId, prId)]);
     const latest = iterations[iterations.length - 1];
-    const [threads, statuses, policies, workItems, snapshot] = await Promise.all([
-      service.getThreads(repoId, prId, latest?.id),
+    const threads = await service.getThreads(repoId, prId, latest?.id);
+    return { raw, iterations, threads };
+  }, [repoId, prId]);
+  const checks = useAsync(async () => {
+    const [statuses, policies, workItems] = await Promise.all([
       service.getStatuses(repoId, prId).catch(() => []),
       service.getPolicyEvaluations(prId),
-      service.getWorkItemRefs(repoId, prId).catch(() => []),
-      // Stacks are detected within the repository only; related PRs from other repos cannot stack on this one.
-      service.loadStacks({ repositoryIds: [repoId], completedDays: 30 }).catch(() => undefined)
+      service.getWorkItemRefs(repoId, prId).catch(() => [])
     ]);
-    // Make sure the PR itself is in the forest even when it is a draft/new PR that the project query missed.
-    let forest: StackForest | undefined = snapshot?.forest;
-    const self = toPrInfo(raw as unknown as RawPullRequest);
-    if (snapshot && !forest!.nodes.has(prId)) {
-      const prs = [...snapshot.prs, self];
-      forest = detectStacks(prs, { commitsByPr: new Map() });
-    }
-    return { raw, iterations, threads, statuses, policies, workItems, forest };
+    return { statuses, policies, workItems };
   }, [repoId, prId]);
+  // Stacks are detected within the repository only; related PRs from other repos cannot stack on this one.
+  const stack = useAsync(() => service.loadStacks({ repositoryIds: [repoId], completedDays: 30 }).catch(() => undefined), [repoId, prId]);
 
-  const reload = data.reload;
-  const d = data.data;
+  const raw0 = core.data?.raw;
+  const forest = React.useMemo<StackForest | undefined>(() => {
+    const snapshot = stack.data;
+    if (!snapshot || !raw0) return undefined;
+    // Make sure the PR itself is in the forest even when it is a draft/new PR that the project query missed.
+    if (snapshot.forest.nodes.has(prId)) return snapshot.forest;
+    return detectStacks([...snapshot.prs, toPrInfo(raw0 as unknown as RawPullRequest)], { commitsByPr: new Map() });
+  }, [stack.data, raw0, prId]);
+
+  const d = core.data && { ...core.data, statuses: checks.data?.statuses ?? [], policies: checks.data?.policies ?? [], workItems: checks.data?.workItems ?? [], forest };
+  /** Light refresh after comments, votes, reviewer edits: the stack cannot have changed, so it is not recomputed. */
+  const reload = () => {
+    core.reload();
+    checks.reload();
+  };
+  /** Full refresh after changes that can alter the stack (status, draft, target branch, parent links). */
+  const reloadAll = () => {
+    reload();
+    stack.reload();
+  };
   const pr: PrInfo | undefined = d ? toPrInfo(d.raw as unknown as RawPullRequest) : undefined;
   const node = d?.forest?.nodes.get(prId);
   const parent = node?.parentId !== undefined ? d!.forest!.nodes.get(node.parentId)?.pr : undefined;
@@ -73,17 +91,17 @@ export function PullRequestView({ repoId, prId, embedded, initialTab = "overview
     try {
       setActionError(undefined);
       await fn();
-      reload();
+      reloadAll();
     } catch (e) {
       setActionError(e);
     }
   };
 
-  if (data.loading && !d) return <div className="sp-app"><Spinner /></div>;
+  if (core.loading && !d) return <div className="sp-app"><Spinner /></div>;
   if (!d || !pr) {
     return (
       <div className="sp-app">
-        <ErrorBanner error={data.error ?? "Pull request not found"} />
+        <ErrorBanner error={core.error ?? "Pull request not found"} />
         {!embedded && <button className="sp-btn" onClick={() => nav.openList()}>Back to list</button>}
       </div>
     );
@@ -130,8 +148,8 @@ export function PullRequestView({ repoId, prId, embedded, initialTab = "overview
                 {pr.status === "active" && !pr.isDraft && <button onClick={() => { close(); guard(() => service.updatePullRequest(pr, { isDraft: true })); }}>Mark as draft</button>}
                 {pr.status === "active" && <button onClick={() => { close(); if (window.confirm("Abandon this pull request?")) guard(() => service.updatePullRequest(pr, { status: 2 })); }}>Abandon</button>}
                 {pr.status === "abandoned" && <button onClick={() => { close(); guard(() => service.updatePullRequest(pr, { status: 1 })); }}>Reactivate</button>}
-                {pr.status === "active" && <SetParentItems pr={pr} forest={d.forest} close={close} onDone={reload} />}
-                <button onClick={() => { close(); reload(); }}>Refresh</button>
+                {pr.status === "active" && <SetParentItems pr={pr} forest={d.forest} close={close} onDone={reloadAll} />}
+                <button onClick={() => { close(); reloadAll(); }}>Refresh</button>
               </div>
             )}
           </Menu>
@@ -145,7 +163,7 @@ export function PullRequestView({ repoId, prId, embedded, initialTab = "overview
         ))}
       </div>
 
-      {d.forest && <StackMap forest={d.forest} currentId={prId} onChanged={reload} />}
+      {d.forest && <StackMap forest={d.forest} currentId={prId} onChanged={reloadAll} />}
 
       {tab === "overview" && (
         <div className="sp-pr-body">
@@ -153,13 +171,14 @@ export function PullRequestView({ repoId, prId, embedded, initialTab = "overview
           <Sidebar pr={pr} raw={raw} workItems={d.workItems as { id: string }[]} onChanged={reload} workItemUrl={nav.workItemUrl} />
         </div>
       )}
-      {tab === "files" && (
+      {tab === "files" && stack.loading && mode === undefined && <Spinner text="Detecting the stack to pick the default diff..." />}
+      {tab === "files" && !(stack.loading && mode === undefined) && (
         <FilesView pr={pr} parent={parent} iterations={d.iterations} threads={d.threads} mode={activeMode} onModeChange={setMode} onChanged={reload} nativeFilesUrl={`${nativeUrl}?_a=files`} />
       )}
       {tab === "updates" && <UpdatesTab pr={pr} iterations={d.iterations} />}
       {tab === "commits" && <CommitsTab pr={pr} />}
 
-      {completing && <CompleteDialog pr={pr} raw={raw} onClose={() => setCompleting(false)} onDone={() => { setCompleting(false); reload(); }} />}
+      {completing && <CompleteDialog pr={pr} raw={raw} onClose={() => setCompleting(false)} onDone={() => { setCompleting(false); reloadAll(); }} />}
     </div>
   );
 }
