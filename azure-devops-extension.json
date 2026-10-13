@@ -1,9 +1,9 @@
 {
   "manifestVersion": 1,
   "id": "stacked-pull-requests",
-  "name": "Stacked Pull Requests",
+  "name": " Pull Requests (Stacked)",
   "version": "0.1.0",
-  "publisher": "your-publisher-id",
+  "publisher": "Pro-Sharp",
   "public": false,
   "description": "Review stacked pull requests layer by layer: a hierarchy of dependent PRs across all repositories, with a branch-only diff, and full review features.",
   "categories": ["Azure Repos"],

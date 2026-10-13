@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Azure DevOps extension that shows stacked pull requests as a hierarchy and lets you review only the part each branch introduced.",
   "license": "MIT",
-  "private": true,
+  "private": false,
   "scripts": {
     "dev": "webpack serve --mode development",
     "build": "webpack --mode production",
