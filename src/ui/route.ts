@@ -13,9 +13,12 @@ export function buildRoute(route: Route): string {
   return `#/pr/${encodeURIComponent(route.repoId)}/${route.prId}${route.tab ? `/${route.tab}` : ""}`;
 }
 
-/** Base web URL of the project, e.g. https://dev.azure.com/org/project. */
-export function projectBaseUrl(org: string, project: string): string {
-  return `https://dev.azure.com/${encodeURIComponent(org)}/${encodeURIComponent(project)}`;
+/**
+ * Base web URL of the project from the collection root, e.g. https://dev.azure.com/org/project on the cloud
+ * or https://tfs.contoso.local/DefaultCollection/project on Azure DevOps Server.
+ */
+export function projectBaseUrl(collectionUrl: string, project: string): string {
+  return `${collectionUrl.replace(/\/+$/, "")}/${encodeURIComponent(project)}`;
 }
 
 export function nativePrUrl(base: string, repoName: string, prId: number): string {

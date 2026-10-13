@@ -61,6 +61,21 @@ npx tfx extension publish --manifest-globs azure-devops-extension.json --token <
 - Keep `"public": false` until you want to list it publicly.
 - Adding a scope later forces every organization to re-authorize the extension, so keep the scope list in the manifest deliberate.
 
+## Azure DevOps Server
+
+The manifest targets Azure DevOps Server 2022 and later (`Microsoft.TeamFoundation.Server`, `[19.0,)`). To test on a
+server, upload the `.vsix` from `npm run package` (or `package:dev`) under **Collection Settings → Extensions → Browse
+local extensions → Manage extensions**, then install it into a collection.
+
+Server-specific behaviour lives in `src/core/api/host.ts`:
+
+- `collectionUrl()` asks the host's location service for the collection root, so links and raw `fetch` calls work
+  under `https://server/DefaultCollection/`.
+- `azure-devops-extension-api` hard-codes `7.2-preview` on every call, which older servers reject. `negotiateApiVersion`
+  wraps the REST clients: when a server answers "out of range", the limit it reports is cached and the call is
+  retried at that version (and at resource version 1 if needed). The cloud never sees a rewritten version.
+- Raw `fetch` calls go through `apiFetch`, which applies the same negotiation.
+
 ## Project conventions
 
 - Pure logic in `src/core` (no SDK imports) and `src/ui/list/filter.ts`; React components stay thin.

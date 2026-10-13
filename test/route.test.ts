@@ -17,8 +17,9 @@ describe("routes", () => {
   });
 
   it("builds URLs", () => {
-    const base = projectBaseUrl("my org", "My Project");
+    const base = projectBaseUrl("https://dev.azure.com/my%20org/", "My Project");
     expect(base).toBe("https://dev.azure.com/my%20org/My%20Project");
+    expect(projectBaseUrl("https://tfs.contoso.local/DefaultCollection", "P")).toBe("https://tfs.contoso.local/DefaultCollection/P");
     expect(nativePrUrl(base, "Repo 1", 5)).toBe(`${base}/_git/Repo%201/pullrequest/5`);
     expect(hubUrl(base, "pub", "ext", "hub", { kind: "pr", repoId: "r", prId: 5 })).toBe(`${base}/_apps/hub/pub.ext.hub#/pr/r/5`);
   });

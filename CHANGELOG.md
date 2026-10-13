@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- Added Azure DevOps Server 2022+ (on-prem) support: the manifest targets Server, URLs are built from the
+  collection root the host reports instead of `dev.azure.com`, and REST calls drop to the highest API version
+  the server accepts
+- Identity search on Server also searches Active Directory
+- Re-queuing a policy no longer throws when the server rejects it
+
 ## 0.1.4
 
 - Fixed: the Stack tab on the native pull request page got narrower while loading (the iframe resize now keeps its width)

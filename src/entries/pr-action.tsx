@@ -1,5 +1,6 @@
 import * as SDK from "azure-devops-extension-sdk";
 import { IHostNavigationService, IProjectPageService } from "azure-devops-extension-api";
+import { collectionUrl } from "../core/api/host";
 import { hubUrl, projectBaseUrl } from "../ui/route";
 import { HUB_CONTRIBUTION } from "./constants";
 
@@ -18,7 +19,7 @@ async function open(ctx: PrActionContext): Promise<void> {
   const project = await (await SDK.getService<IProjectPageService>("ms.vss-tfs-web.tfs-page-data-service")).getProject();
   const nav = await SDK.getService<IHostNavigationService>("ms.vss-features.host-navigation-service");
   const ext = SDK.getExtensionContext();
-  const base = projectBaseUrl(SDK.getHost().name, project!.name);
+  const base = projectBaseUrl(await collectionUrl(), project!.name);
   nav.navigate(hubUrl(base, ext.publisherId, ext.extensionId, HUB_CONTRIBUTION, { kind: "pr", repoId, prId }));
 }
 
