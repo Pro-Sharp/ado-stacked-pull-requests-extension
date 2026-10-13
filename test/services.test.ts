@@ -73,6 +73,71 @@ describe("StackedPrService.loadStacks", () => {
   });
 });
 
+describe("progressive loading", () => {
+  it("emits provisional snapshots while pages and commits are still arriving", async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) => rawPr(i + 1, `b${i}`, `h${i}`, { targetRefName: `refs/heads/t${i}` }));
+    fake.getPullRequestsByProject = vi.fn().mockResolvedValueOnce(page1).mockResolvedValueOnce([rawPr(101, "x", "hx", { targetRefName: "refs/heads/t0" })]);
+    fake.getPullRequestCommits = vi.fn().mockResolvedValue([]);
+    const sizes: number[] = [];
+    const snap = await new StackedPrService(ctx).loadStacks({ onPartial: (s) => sizes.push(s.prs.length) });
+    expect(sizes[0]).toBe(100); // the first page is shown before the second one was requested
+    expect(sizes).toContain(101);
+    expect(snap.prs).toHaveLength(101);
+    expect(snap.repositories).toEqual([repo]);
+  });
+
+  it("stops issuing requests once cancelled", async () => {
+    fake.getPullRequestsByProject = vi.fn().mockResolvedValue(Array.from({ length: 100 }, (_, i) => rawPr(i + 1, `b${i}`, `h${i}`)));
+    fake.getPullRequestCommits = vi.fn().mockResolvedValue([]);
+    let stop = false;
+    await new StackedPrService(ctx).loadStacks({ onPartial: () => (stop = true), cancelled: () => stop });
+    expect(fake.getPullRequestsByProject).toHaveBeenCalledTimes(1);
+    expect(fake.getPullRequestCommits).not.toHaveBeenCalled();
+  });
+
+  it("keeps rendering when a single PR's commit lookup fails", async () => {
+    fake.getPullRequestsByProject = vi.fn().mockResolvedValue([rawPr(1, "a", "a1"), rawPr(2, "b", "b1")]);
+    fake.getPullRequestCommits = vi.fn(async (_r: string, id: number) => {
+      if (id === 1) throw { status: 404 };
+      return [{ commitId: "b1" }];
+    });
+    const snap = await new StackedPrService(ctx).loadStacks();
+    expect(snap.prs).toHaveLength(2);
+  });
+
+  it("streams native change pages as they arrive", async () => {
+    fake.getPullRequestIterationChanges = vi
+      .fn()
+      .mockResolvedValueOnce({ changeEntries: [{ changeType: 2, changeTrackingId: 1, item: { path: "/b.ts" } }], nextSkip: 500 })
+      .mockResolvedValueOnce({ changeEntries: [{ changeType: 2, changeTrackingId: 2, item: { path: "/a.ts" } }], nextSkip: 0 });
+    const pages: string[][] = [];
+    const all = await new StackedPrService(ctx).getNativeChanges(pr(1, "h"), 3, 0, (p) => pages.push(p.map((f) => f.path)));
+    expect(pages).toEqual([["/b.ts"], ["/a.ts"]]);
+    expect(all.map((f) => f.path)).toEqual(["/a.ts", "/b.ts"]);
+    expect(fake.getPullRequestIterationChanges.mock.calls[1][5]).toBe(500);
+  });
+
+  it("follows the continuation token when listing a PR's commits", async () => {
+    const first = Object.assign([{ commitId: "c1" }], { continuationToken: "next" });
+    fake.getPullRequestCommits = vi.fn().mockResolvedValue(first);
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ value: [{ commitId: "c2" }] }),
+      headers: { get: () => null }
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      const seen: number[] = [];
+      const all = await new StackedPrService(ctx).getCommits("r1", 5, (_p, acc) => seen.push(acc.length));
+      expect(all.map((c) => c.commitId)).toEqual(["c1", "c2"]);
+      expect(seen).toEqual([1, 2]);
+      expect(fetchMock.mock.calls[0][0]).toContain("continuationToken=next");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe("layer diff", () => {
   it("diffs from the merge base of parent and child tips, skipping folders", async () => {
     fake.getMergeBases = vi.fn().mockResolvedValue([{ commitId: "base1" }]);

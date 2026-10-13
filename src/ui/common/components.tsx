@@ -109,6 +109,40 @@ export function Markdown({ text, className = "sp-description" }: { text?: string
   return <div className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
+/**
+ * Invisible marker placed after a partially rendered list. When it scrolls into (or near) view it calls `onVisible`,
+ * which grows the list: the infinite-scroll pattern of the native PR pages. `version` must change whenever more
+ * items were added so the observer re-arms (an observer only fires on a visibility change). Without
+ * IntersectionObserver (old hosts, tests) it asks for more immediately, i.e. the list renders in full.
+ */
+export function MoreSentinel({ onVisible, version, label = "Loading more..." }: { onVisible: () => void; version: number; label?: string }) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") {
+      onVisible();
+      return;
+    }
+    const observer = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && onVisible(), { rootMargin: "600px" });
+    observer.observe(el);
+    return () => observer.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version]);
+  return (
+    <div ref={ref} className="sp-muted" style={{ textAlign: "center", padding: 12, fontSize: 12 }}>
+      {label}
+    </div>
+  );
+}
+
+/** Windowed rendering state: show `step` items first and grow by `step` each time the sentinel is reached. */
+export function useIncremental(total: number, step: number, resetKey: unknown = undefined): { limit: number; more: () => void; hasMore: boolean } {
+  const [limit, setLimit] = React.useState(step);
+  React.useEffect(() => setLimit(step), [resetKey, step]);
+  const more = React.useCallback(() => setLimit((l) => l + step), [step]);
+  return { limit, more, hasMore: limit < total };
+}
+
 export function useAsync<T>(load: () => Promise<T>, deps: React.DependencyList): { data?: T; error?: unknown; loading: boolean; reload: () => void } {
   const [state, setState] = React.useState<{ data?: T; error?: unknown; loading: boolean }>({ loading: true });
   const [tick, setTick] = React.useState(0);

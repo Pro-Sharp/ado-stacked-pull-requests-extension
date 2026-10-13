@@ -13,6 +13,27 @@ export async function mapLimit<T, R>(items: T[], limit: number, worker: (item: T
   return results;
 }
 
+/**
+ * Pulls a skip/top paged endpoint page by page. `onPage` fires as soon as each page arrives (so callers can render
+ * early); the accumulated list is returned once the last (short) page is read. Stops early when `cancelled()` flips.
+ */
+export async function pagedFetch<T>(
+  fetchPage: (skip: number, top: number) => Promise<T[]>,
+  pageSize: number,
+  onPage?: (page: T[], all: T[]) => void,
+  cancelled?: () => boolean
+): Promise<T[]> {
+  const all: T[] = [];
+  for (let skip = 0; ; skip += pageSize) {
+    if (cancelled?.()) break;
+    const page = await withRetry(() => fetchPage(skip, pageSize));
+    all.push(...page);
+    onPage?.(page, all);
+    if (page.length < pageSize) break;
+  }
+  return all;
+}
+
 /** Memoises async calls by key, de-duplicating concurrent requests and dropping rejections. */
 export class AsyncCache<V> {
   private readonly entries = new Map<string, Promise<V>>();

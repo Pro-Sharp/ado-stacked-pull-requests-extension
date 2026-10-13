@@ -6,7 +6,7 @@ import { buildDiffRows, DiffRow, expandGap } from "../../core/diff/lineDiff";
 import { bucketThreads, placeThreads } from "../../core/diff/threads";
 import { buildThreadPayload, fallbackComment } from "../../core/diff/threadPayload";
 import { PrInfo } from "../../core/stack/types";
-import { ErrorBanner, Spinner, useAsync } from "../common/components";
+import { ErrorBanner, MoreSentinel, Spinner, useAsync, useIncremental } from "../common/components";
 import { dirName, fileName } from "../common/format";
 import { useService } from "../context";
 import { buildTree, changeLetter, flattenTree } from "./tree";
@@ -37,27 +37,55 @@ interface FileSet {
 }
 
 const MAX_ROWS = 4000;
+const ROW_STEP = 400;
 
 export function FilesView({ pr, parent, iterations, threads, mode, onModeChange, onChanged, nativeFilesUrl }: Props) {
   const service = useService();
   const latest = iterations[iterations.length - 1];
   const headSha = latest?.sourceRefCommit?.commitId ?? pr.headSha;
 
-  const fileSet = useAsync<FileSet>(async () => {
-    if (!latest) return { files: [], baseSha: "", headSha, nativeBaseSha: "" };
-    const nativeBase = latest.commonRefCommit?.commitId ?? "";
-    const native = await service.getNativeChanges(pr, latest.id);
-    if (mode === "layer" && parent) {
-      const range = await service.getLayerRange({ ...pr, headSha }, parent);
-      const tracking = new Map(native.map((f) => [f.path, f.changeTrackingId]));
-      return {
-        files: range.files.map((f) => ({ ...f, changeTrackingId: tracking.get(f.path) })),
-        baseSha: range.baseSha,
-        headSha,
-        nativeBaseSha: nativeBase
-      };
+  // The file list streams in page by page: the tree and the first diffs render while later pages are still loading.
+  const [fileSet, setFileSet] = React.useState<{ data?: FileSet; loading: boolean; error?: unknown }>({ loading: true });
+  React.useEffect(() => {
+    let alive = true;
+    setFileSet({ loading: true });
+    if (!latest) {
+      setFileSet({ data: { files: [], baseSha: "", headSha, nativeBaseSha: "" }, loading: false });
+      return;
     }
-    return { files: native, baseSha: nativeBase, headSha, nativeBaseSha: nativeBase };
+    const nativeBase = latest.commonRefCommit?.commitId ?? "";
+    const show = (files: FileEntry[], baseSha: string, loading: boolean) =>
+      alive && setFileSet({ data: { files: [...files].sort((a, b) => a.path.localeCompare(b.path)), baseSha, headSha, nativeBaseSha: nativeBase }, loading });
+    (async () => {
+      try {
+        if (mode === "layer" && parent) {
+          // Tracking ids are only needed when commenting, so the native listing runs alongside the layer diff.
+          const nativeAll = service.getNativeChanges(pr, latest.id);
+          nativeAll.catch(() => undefined);
+          const soFar: FileEntry[] = [];
+          const range = await service.getLayerRange({ ...pr, headSha }, parent, (base, page) => {
+            soFar.push(...page);
+            show(soFar, base, true);
+          });
+          show(range.files, range.baseSha, true);
+          const tracking = new Map((await nativeAll).map((f) => [f.path, f.changeTrackingId]));
+          show(range.files.map((f) => ({ ...f, changeTrackingId: tracking.get(f.path) })), range.baseSha, false);
+        } else {
+          const soFar: FileEntry[] = [];
+          const all = await service.getNativeChanges(pr, latest.id, 0, (page) => {
+            soFar.push(...page);
+            show(soFar, nativeBase, true);
+          });
+          show(all, nativeBase, false);
+        }
+      } catch (error) {
+        if (alive) setFileSet((s) => ({ ...s, error, loading: false }));
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pr.id, headSha, mode, parent?.id]);
 
   const [selected, setSelected] = React.useState<string>();
@@ -69,6 +97,8 @@ export function FilesView({ pr, parent, iterations, threads, mode, onModeChange,
   const buckets = React.useMemo(() => bucketThreads(threads, new Set((fileSet.data?.files ?? []).map((f) => f.path))), [threads, fileSet.data]);
   const tree = React.useMemo(() => flattenTree(buildTree(files), collapsed), [files, collapsed]);
   const shown = selected ? files.filter((f) => f.path === selected) : files;
+  // Infinite scroll over the diffs: only the first files are mounted (and fetch their content); more follow on scroll.
+  const paging = useIncremental(shown.length, 8, `${selected}|${filter}|${mode}|${parent?.id}|${pr.id}`);
 
   return (
     <div>
@@ -101,7 +131,7 @@ export function FilesView({ pr, parent, iterations, threads, mode, onModeChange,
       </div>
 
       <ErrorBanner error={fileSet.error} />
-      {fileSet.loading && <Spinner />}
+      {fileSet.loading && <Spinner text={fileSet.data?.files.length ? `Loaded ${fileSet.data.files.length} changed files, loading more...` : "Loading..."} />}
 
       {fileSet.data && (
         <div className="sp-files">
@@ -142,7 +172,7 @@ export function FilesView({ pr, parent, iterations, threads, mode, onModeChange,
               </div>
             )}
             {shown.length === 0 && <div className="sp-muted" style={{ padding: 30, textAlign: "center" }}>No changes in this view.</div>}
-            {shown.map((f) => (
+            {shown.slice(0, paging.limit).map((f) => (
               <DiffFile
                 key={`${f.path}:${fileSet.data!.baseSha}:${fileSet.data!.headSha}`}
                 pr={pr}
@@ -153,6 +183,7 @@ export function FilesView({ pr, parent, iterations, threads, mode, onModeChange,
                 onChanged={onChanged}
               />
             ))}
+            {paging.hasMore && <MoreSentinel onVisible={paging.more} version={paging.limit} label={`Showing ${paging.limit} of ${shown.length} files, scroll for more...`} />}
           </div>
         </div>
       )}
@@ -211,8 +242,10 @@ function DiffFile({ pr, file, set, iterationId, threads, onChanged }: {
     }
     return out;
   }, [result, expanded]);
-  const visible = rows.slice(0, MAX_ROWS);
-  const truncated = rows.length > MAX_ROWS;
+  // Rows are windowed too: a large file shows its first screenfuls and grows on scroll, up to the hard cap.
+  const rowPaging = useIncremental(Math.min(rows.length, MAX_ROWS), ROW_STEP, result);
+  const visible = React.useMemo(() => rows.slice(0, Math.min(rowPaging.limit, MAX_ROWS)), [rows, rowPaging.limit]);
+  const truncated = rows.length > MAX_ROWS && rowPaging.limit >= MAX_ROWS;
   const placed = React.useMemo(() => placeThreads(threads, visible), [threads, visible]);
 
   const submit = async (row: DiffRow, text: string) => {
@@ -303,6 +336,7 @@ function DiffFile({ pr, file, set, iterationId, threads, onChanged }: {
               </tbody>
             </table>
           )}
+          {result && rowPaging.hasMore && <MoreSentinel onVisible={rowPaging.more} version={rowPaging.limit} label="Loading more lines..." />}
         </>
       )}
     </div>

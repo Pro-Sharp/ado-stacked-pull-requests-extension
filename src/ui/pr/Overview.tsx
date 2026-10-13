@@ -4,7 +4,7 @@ import { PolicyEvaluationRecord } from "azure-devops-extension-api/Policy";
 import { shortRef } from "../../core/api/mapping";
 import { isResolved, isSystemThread } from "../../core/diff/threads";
 import { PrInfo } from "../../core/stack/types";
-import { Avatar, Markdown } from "../common/components";
+import { Avatar, Markdown, MoreSentinel, useIncremental } from "../common/components";
 import { shortDate, shortSha, timeAgo } from "../common/format";
 import { useService } from "../context";
 import { Composer, ThreadView } from "./Threads";
@@ -73,6 +73,8 @@ export function Overview({ pr, raw, iterations, threads, statuses, policies, onC
   });
   entries.sort((a, b) => b.at - a.at);
   const feed = showAll ? entries : entries.filter((e) => e.marker === undefined);
+  // The activity feed is windowed: the newest entries render first and older ones are added on scroll.
+  const paging = useIncremental(feed.length, 25, `${pr.id}|${showAll}`);
 
   const completedPolicies = policies.filter((p) => p.status === 2).length;
 
@@ -168,17 +170,21 @@ export function Overview({ pr, raw, iterations, threads, statuses, policies, onC
             }} />
           </div>
         </div>
-        {feed.map((e, i) => (
+        {feed.slice(0, paging.limit).map((e, i) => (
           <div className="entry" key={i}>
             {e.marker !== undefined && <span className="marker">{e.marker}</span>}
             {e.node}
           </div>
         ))}
-        <div className="sp-activity-line" style={{ paddingLeft: 0 }}>
-          <Avatar name={pr.authorName} url={raw.createdBy?.imageUrl} size={22} />
-          <div className="main">{pr.authorName} created the pull request</div>
-          <div className="when">{shortDate(pr.creationDate)}</div>
-        </div>
+        {paging.hasMore ? (
+          <MoreSentinel onVisible={paging.more} version={paging.limit} label={`Showing ${paging.limit} of ${feed.length} activities, scroll for more...`} />
+        ) : (
+          <div className="sp-activity-line" style={{ paddingLeft: 0 }}>
+            <Avatar name={pr.authorName} url={raw.createdBy?.imageUrl} size={22} />
+            <div className="main">{pr.authorName} created the pull request</div>
+            <div className="when">{shortDate(pr.creationDate)}</div>
+          </div>
+        )}
       </div>
       <div className="sp-muted" style={{ fontSize: 11, marginTop: 8 }}>
         Source tip {shortSha(pr.headSha)} · created {timeAgo(pr.creationDate)}
