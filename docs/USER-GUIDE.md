@@ -12,6 +12,16 @@ Open **Repos → Pull Requests (Stacked)** in your project.
 
 Your tab, filters and repository selection are remembered in the browser.
 
+## Turning it on or off
+
+Everything the extension adds sits behind the **Stacked Pull Requests** preview feature, which is on by default:
+the hub, the Stack tab on pull requests and the "Open stacked review" action. To hide them, open your user menu
+(top right) → **Preview features** and switch it off.
+
+- **For yourself**: keep the dropdown on your own name.
+- **For everyone**: organization or collection administrators can pick the organization (or collection on Azure
+  DevOps Server) in the dropdown and set it there. Each user can still override the organization setting.
+
 ## Reviewing a PR
 
 Click a PR title. The layout follows the native page:

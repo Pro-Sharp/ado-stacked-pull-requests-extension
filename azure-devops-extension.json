@@ -31,8 +31,21 @@
   ],
   "contributions": [
     {
+      "id": "stacked-prs-feature",
+      "type": "ms.vss-web.feature",
+      "description": "Shows the Pull Requests (Stacked) hub, the Stack tab on pull requests and the \"Open stacked review\" action.",
+      "targets": ["ms.vss-web.managed-features", "ms.vss-web.managed-features-onprem"],
+      "properties": {
+        "name": "Stacked Pull Requests",
+        "userConfigurable": true,
+        "hostConfigurable": true,
+        "defaultState": true
+      }
+    },
+    {
       "id": "stacked-prs-hub",
       "type": "ms.vss-web.hub",
+      "constraints": [{ "name": "Feature", "properties": { "featureId": "Pro-Sharp.stacked-pull-requests.stacked-prs-feature" } }],
       "targets": ["ms.vss-code-web.code-hub-group"],
       "properties": {
         "name": " Pull Requests (Stacked)",
@@ -44,6 +57,7 @@
     {
       "id": "stacked-prs-pr-tab",
       "type": "ms.vss-web.tab",
+      "constraints": [{ "name": "Feature", "properties": { "featureId": "Pro-Sharp.stacked-pull-requests.stacked-prs-feature" } }],
       "targets": ["ms.vss-code-web.pr-tabs"],
       "properties": {
         "name": "Stack",
@@ -53,6 +67,7 @@
     {
       "id": "stacked-prs-pr-action",
       "type": "ms.vss-web.action",
+      "constraints": [{ "name": "Feature", "properties": { "featureId": "Pro-Sharp.stacked-pull-requests.stacked-prs-feature" } }],
       "targets": ["ms.vss-code-web.pull-request-action-menu"],
       "properties": {
         "text": "Open stacked review",
