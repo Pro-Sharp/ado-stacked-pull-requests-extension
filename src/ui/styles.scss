@@ -9,18 +9,33 @@
   --sp-link: var(--communication-foreground, #0078d4);
   --sp-primary: var(--communication-background, #0078d4);
   --sp-hover: var(--palette-black-alpha-6, rgba(0, 0, 0, 0.06));
-  --sp-add-bg: #e6f4e6;
-  --sp-add-num: #cfe9cf;
-  --sp-del-bg: #fbe9e9;
-  --sp-del-num: #f5d3d3;
+  --sp-add-bg: #dff3df;
+  --sp-add-num: #c4e6c4;
+  --sp-del-bg: #fde4e4;
+  --sp-del-num: #f6c9c9;
   --sp-success: #107c10;
   --sp-warn: #c19c00;
   --sp-danger: #c50f1f;
   --sp-shadow: 0 1.6px 3.6px rgba(0, 0, 0, 0.13), 0 0.3px 0.9px rgba(0, 0, 0, 0.1);
 }
 
+// The palette follows the host theme (see ui/theme.ts), which can differ from the OS setting.
+:root[data-sp-theme="dark"] {
+  --sp-bg: var(--background-color, #1b1a19);
+  --sp-card: var(--callout-background-color, #292827);
+  --sp-text: var(--text-primary-color, rgba(255, 255, 255, 0.9));
+  --sp-text-2: var(--text-secondary-color, rgba(255, 255, 255, 0.6));
+  --sp-border: rgba(255, 255, 255, 0.12);
+  --sp-hover: rgba(255, 255, 255, 0.08);
+  --sp-add-bg: #1e3a1e;
+  --sp-add-num: #264a26;
+  --sp-del-bg: #3d2020;
+  --sp-del-num: #4d2828;
+}
+
+// Without a detected theme (e.g. a host that sets no background) fall back to the OS preference.
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-sp-theme]) {
     --sp-bg: var(--background-color, #1b1a19);
     --sp-card: var(--callout-background-color, #292827);
     --sp-text: var(--text-primary-color, rgba(255, 255, 255, 0.9));

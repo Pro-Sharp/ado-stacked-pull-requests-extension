@@ -5,6 +5,7 @@ import { IHostNavigationService } from "azure-devops-extension-api";
 import { StackedPrService } from "../core/api/services";
 import { NavContext, Navigator, ServiceContext } from "../ui/context";
 import { buildRoute, nativePrUrl, projectBaseUrl, Route } from "../ui/route";
+import { watchTheme } from "../ui/theme";
 import "../ui/styles.scss";
 
 
@@ -17,6 +18,7 @@ export async function boot(render: (ctx: { service: StackedPrService; navigator:
   await SDK.init({ loaded: false, applyTheme: true });
   try {
     await SDK.ready();
+    watchTheme();
     const service = await StackedPrService.create();
     const host = await navigationService();
     const base = projectBaseUrl(SDK.getHost().name, service.ctx.projectName);
