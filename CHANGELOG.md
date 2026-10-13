@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3
+
+- Rewrote the README as a showcase page for the Marketplace and GitHub
+
 ## 0.1.2
 
 - Fixed: README screenshots did not show on the Marketplace page (the images are now packaged with the extension)
