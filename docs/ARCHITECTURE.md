@@ -1,10 +1,12 @@
+<!-- @format -->
+
 # Architecture
 
 ## Overview
 
 ```
 Azure DevOps (host page)
- ├─ Repos ▸ "Stacked PRs" hub  (dist/hub.html)        → StackList / PullRequestView, hash routing
+ ├─ Repos ▸ "Pull Requests (Stacked)" hub  (dist/hub.html)        → StackList / PullRequestView, hash routing
  ├─ Native PR page ▸ "Stack" tab (dist/pr-tab.html)    → PullRequestView (embedded)
  └─ PR "..." menu ▸ action     (dist/pr-action.html)   → navigates to the hub
 
@@ -17,14 +19,14 @@ There is no backend. All state lives in Azure DevOps (PRs, threads, votes, PR pr
 
 ## Source layout
 
-| Path | Responsibility |
-|---|---|
-| `src/core/stack` | **Stack engine** (pure). `detectStacks` builds a forest from PRs plus per-PR commit sets; `stackRows` lays it out as a tree. |
-| `src/core/diff` | **Diff and comments** (pure). `buildDiffRows`, `anchorForRow` (maps layer-diff rows onto native positions), `buildThreadPayload`, thread bucketing. |
-| `src/core/api` | **REST layer.** `StackedPrService` wraps the SDK clients; `mapping` converts REST shapes; `concurrency` has `mapLimit`, `AsyncCache`, `withRetry`. |
-| `src/ui` | React 16 components: `list/` (stack list, filters), `pr/` (Overview, Files, Updates, Commits, Sidebar, StackMap, Threads, Actions), `common/`. |
-| `src/entries` | One bundle per contribution plus `boot.tsx` (SDK handshake, theming, providers). |
-| `src/harness` | Mock-data harness (not shipped). |
+| Path             | Responsibility                                                                                                                                      |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/core/stack` | **Stack engine** (pure). `detectStacks` builds a forest from PRs plus per-PR commit sets; `stackRows` lays it out as a tree.                        |
+| `src/core/diff`  | **Diff and comments** (pure). `buildDiffRows`, `anchorForRow` (maps layer-diff rows onto native positions), `buildThreadPayload`, thread bucketing. |
+| `src/core/api`   | **REST layer.** `StackedPrService` wraps the SDK clients; `mapping` converts REST shapes; `concurrency` has `mapLimit`, `AsyncCache`, `withRetry`.  |
+| `src/ui`         | React 16 components: `list/` (stack list, filters), `pr/` (Overview, Files, Updates, Commits, Sidebar, StackMap, Threads, Actions), `common/`.      |
+| `src/entries`    | One bundle per contribution plus `boot.tsx` (SDK handshake, theming, providers).                                                                    |
+| `src/harness`    | Mock-data harness (not shipped).                                                                                                                    |
 
 The pure modules do not import the SDK, which keeps them fast to test.
 
@@ -37,12 +39,12 @@ For each PR (the child), candidate parents are, in priority order:
 1. A **manual** parent from the PR property `StackedPRs.ParentPullRequestId`.
 2. **Explicit**: a PR in the same repository whose source branch is this PR's target branch.
 3. **Contained**: a PR with the same repository and target whose commits are in the child:
-   - the parent's tip is in the child's commit list → *in sync*;
-   - tips differ but the commit sets overlap, and the parent is older → *parent ahead* (the parent has moved on since the child branched).
+   - the parent's tip is in the child's commit list → _in sync_;
+   - tips differ but the commit sets overlap, and the parent is older → _parent ahead_ (the parent has moved on since the child branched).
 
-Ranking: explicit before inferred, then in-sync before parent-ahead (partial overlap also matches *sibling* PRs, so it is the weaker signal), then the candidate with the most commits (deepest in the chain). That is a transitive reduction: `A ⊂ A2 ⊂ B` gives `A ← A2 ← B`.
+Ranking: explicit before inferred, then in-sync before parent-ahead (partial overlap also matches _sibling_ PRs, so it is the weaker signal), then the candidate with the most commits (deepest in the chain). That is a transitive reduction: `A ⊂ A2 ⊂ B` gives `A ← A2 ← B`.
 
-Cycles (possible with manual parents) are broken by dropping the edge that closes them. A completed parent yields *parent merged* for its children, which covers squash merges where the child still contains the parent's commits.
+Cycles (possible with manual parents) are broken by dropping the edge that closes them. A completed parent yields _parent merged_ for its children, which covers squash merges where the child still contains the parent's commits.
 
 Cost: only PRs that share a (repo, target) group with another PR need commit lists, fetched with concurrency 4. Manual-parent properties are read with concurrency 6.
 
@@ -87,10 +89,10 @@ Reading threads: `getThreads(repo, pr, iteration = latest)` returns positions re
 
 See `azure-devops-extension.json`:
 
-| Contribution | Type | Target |
-|---|---|---|
-| `stacked-prs-hub` | `ms.vss-web.hub` | `ms.vss-code-web.code-hub-group` |
-| `stacked-prs-pr-tab` | `ms.vss-web.tab` | `ms.vss-code-web.pr-tabs` |
+| Contribution            | Type                | Target                                     |
+| ----------------------- | ------------------- | ------------------------------------------ |
+| `stacked-prs-hub`       | `ms.vss-web.hub`    | `ms.vss-code-web.code-hub-group`           |
+| `stacked-prs-pr-tab`    | `ms.vss-web.tab`    | `ms.vss-code-web.pr-tabs`                  |
 | `stacked-prs-pr-action` | `ms.vss-web.action` | `ms.vss-code-web.pull-request-action-menu` |
 
 The PR tab receives `{ pullRequestId, repositoryId }` from `SDK.getConfiguration()`.

@@ -1,8 +1,8 @@
 # User guide
 
-## The Stacked PRs page
+## The Pull Requests (Stacked) page
 
-Open **Repos → Stacked PRs** in your project.
+Open **Repos → Pull Requests (Stacked)** in your project.
 
 - **Hierarchy.** Pull requests are shown as a tree. A PR that sits on top of another is indented under it. PRs from every repository appear in the same list; each repository's stacks are detected separately.
 - **Tabs.** *Active*, *Mine* (you are the author or a reviewer), *Needs my review* (you are a reviewer and have not voted), *Drafts*, *Completed*.

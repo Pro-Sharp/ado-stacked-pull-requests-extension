@@ -31,7 +31,7 @@
       "type": "ms.vss-web.hub",
       "targets": ["ms.vss-code-web.code-hub-group"],
       "properties": {
-        "name": "Stacked PRs",
+        "name": " Pull Requests (Stacked)",
         "order": 101,
         "uri": "dist/hub.html",
         "iconName": "BranchPullRequest"

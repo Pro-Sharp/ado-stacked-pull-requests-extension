@@ -21,7 +21,7 @@ When you branch `b` from `a` and open both PRs against `main`, Azure DevOps show
 | **Per-PR approvals** | An approval lands on the PR you are reviewing and nowhere else. Approving B does not approve A. |
 | **Stack health** | Flags *parent ahead* (needs a rebase), *parent merged* (offers a one-click retarget) and merge conflicts. |
 | **Merge order** | Optional status that a branch policy can require, so B cannot be completed before A. |
-| **Where it lives** | A **Stacked PRs** page under *Repos*, a **Stack** tab on every PR, and an **Open stacked review** item in the PR "..." menu. |
+| **Where it lives** | A **Pull Requests (Stacked)** page under *Repos*, a **Stack** tab on every PR, and an **Open stacked review** item in the PR "..." menu. |
 
 ![Reviewing only this PR's layer](docs/images/review-layer-diff.jpg)
 
@@ -55,7 +55,7 @@ The extension requests these scopes: `vso.code_write`, `vso.code_status`, `vso.b
 
 See the [user guide](docs/USER-GUIDE.md). In short:
 
-1. Open **Repos → Stacked PRs**. Filter by repository, search, or use the *Needs my review* tab.
+1. Open **Repos → Pull Requests (Stacked)**. Filter by repository, search, or use the *Needs my review* tab.
 2. Click a PR. The **stack map** above the tabs shows where it sits in the stack.
 3. In **Files**, choose **This PR only** to review just this layer. Click **+** next to a line to comment.
 4. Vote from the header. The vote applies to this PR only.

@@ -1,3 +1,5 @@
+<!-- @format -->
+
 # Development
 
 ## Requirements
@@ -7,15 +9,15 @@
 
 ## Commands
 
-| Command | What it does |
-|---|---|
-| `npm test` | Unit tests (Vitest, 70+) |
-| `npm run test:watch` | Watch mode |
-| `npm run typecheck` | `tsc --noEmit`, strict |
-| `npm run build` | Production webpack build into `dist/` |
-| `npm run dev` | webpack-dev-server on `https://localhost:3000` (hot reload) |
-| `npm run package` | Build and create `dist-vsix/*.vsix` with tfx |
-| `npm run package:dev` | Same, with the dev manifest overrides |
+| Command               | What it does                                                |
+| --------------------- | ----------------------------------------------------------- |
+| `npm test`            | Unit tests (Vitest, 70+)                                    |
+| `npm run test:watch`  | Watch mode                                                  |
+| `npm run typecheck`   | `tsc --noEmit`, strict                                      |
+| `npm run build`       | Production webpack build into `dist/`                       |
+| `npm run dev`         | webpack-dev-server on `https://localhost:3000` (hot reload) |
+| `npm run package`     | Build and create `dist-vsix/*.vsix` with tfx                |
+| `npm run package:dev` | Same, with the dev manifest overrides                       |
 
 ## Visual harness (no Azure DevOps needed)
 
@@ -45,7 +47,7 @@ These are the assumptions that the unit tests cannot cover:
 1. A comment created from **This PR only** on an added line appears on the same line in the native PR page.
 2. The **Stack** tab receives the PR in `SDK.getConfiguration()`.
 3. The PR "..." menu entry appears and its context contains the PR id and repository id (the handler accepts several shapes).
-4. Policy evaluations load (the Policy API is a preview endpoint) and *Queue* re-runs a build policy.
+4. Policy evaluations load (the Policy API is a preview endpoint) and _Queue_ re-runs a build policy.
 
 ## Publishing
 
@@ -54,7 +56,7 @@ npm run package
 npx tfx extension publish --manifest-globs azure-devops-extension.json --token <PAT> --share-with <your-org>
 ```
 
-- The PAT needs the *Marketplace → Manage* scope.
+- The PAT needs the _Marketplace → Manage_ scope.
 - Bump `version` in `azure-devops-extension.json` (and `package.json`) for each release; the Marketplace rejects duplicates.
 - Keep `"public": false` until you want to list it publicly.
 - Adding a scope later forces every organization to re-authorize the extension, so keep the scope list in the manifest deliberate.
