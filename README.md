@@ -111,6 +111,8 @@ Prefer to build it yourself? See [Development](docs/DEVELOPMENT.md#publishing).
 
 Azure DevOps extensions run in a sandbox, which shapes a few things:
 
+- Everything can be switched off per user or for the whole organization under **Preview features**
+  (*Stacked Pull Requests*, on by default).
 - The built-in PR page cannot be replaced, so this adds its own full review page and links to it from the native one.
 - A comment on a **deleted** line of a layer diff is attached to the nearest remaining line and quotes the removed text.
 - Merge order is enforced through a branch policy on the optional status. Nothing runs in the background.

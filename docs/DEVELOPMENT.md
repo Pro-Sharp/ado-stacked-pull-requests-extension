@@ -17,7 +17,7 @@
 | `npm run build`       | Production webpack build into `dist/`                       |
 | `npm run dev`         | webpack-dev-server on `https://localhost:3000` (hot reload) |
 | `npm run package`     | Build and create `dist-vsix/*.vsix` with tfx                |
-| `npm run package:dev` | Same, with the dev manifest overrides                       |
+| `npm run package:dev` | Same, with the dev manifest (see below)                     |
 
 ## Visual harness (no Azure DevOps needed)
 
@@ -33,7 +33,9 @@ Open <http://localhost:5173/harness.html> (list) or `harness.html#/pr/repo-hub/1
 ## Testing in a real organization
 
 1. Set your publisher id in `azure-devops-extension.json` (`publisher`).
-2. Package the dev build: `npm run package:dev`. The override file `azure-devops-extension.dev.json` changes the id and sets `baseUri` to `https://localhost:3000`.
+2. Package the dev build: `npm run package:dev`. `scripts/dev-manifest.js` applies `azure-devops-extension.dev.json`
+   (a different id and `baseUri` set to `https://localhost:3000`) and rewrites the feature flag's `featureId` to the dev
+   id, which tfx's `--overrides-file` cannot do because it appends contributions instead of replacing them.
 3. Upload the `.vsix` as a private extension and share it with your organization (or install directly from the Marketplace management page).
 4. `npm run dev` and accept the self-signed certificate once by opening <https://localhost:3000/hub.html>. The extension now loads from your machine with hot reload.
 5. Debug in Firefox or browser dev tools: the extension runs inside iframes of the Azure DevOps page.
@@ -75,6 +77,13 @@ Server-specific behaviour lives in `src/core/api/host.ts`:
   wraps the REST clients: when a server answers "out of range", the limit it reports is cached and the call is
   retried at that version (and at resource version 1 if needed). The cloud never sees a rewritten version.
 - Raw `fetch` calls go through `apiFetch`, which applies the same negotiation.
+
+## Feature flag
+
+The `stacked-prs-feature` contribution (`ms.vss-web.feature`) is a native Azure DevOps preview feature, on by default
+and switchable per user and per organization or collection. Every UI contribution carries a `Feature` constraint on
+`{publisher}.{extension id}.stacked-prs-feature`, so when it is off the host does not load the hub, tab or action at
+all. `test/manifest.test.ts` fails if a new contribution is added without the constraint.
 
 ## Project conventions
 

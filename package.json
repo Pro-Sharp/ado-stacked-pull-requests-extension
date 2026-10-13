@@ -1,6 +1,6 @@
 {
   "name": "ado-stacked-pullrequests",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Azure DevOps extension that shows stacked pull requests as a hierarchy and lets you review only the part each branch introduced.",
   "license": "MIT",
   "private": false,
@@ -11,7 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "package": "npm run build && tfx extension create --manifest-globs azure-devops-extension.json --output-path dist-vsix",
-    "package:dev": "npm run build && tfx extension create --manifest-globs azure-devops-extension.json --overrides-file azure-devops-extension.dev.json --output-path dist-vsix"
+    "package:dev": "npm run build && node scripts/dev-manifest.js && tfx extension create --manifest-globs azure-devops-extension.dev.generated.json --output-path dist-vsix"
   },
   "dependencies": {
     "azure-devops-extension-api": "^5.279.1",
