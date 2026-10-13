@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - Added Azure DevOps Server 2022+ (on-prem) support: the manifest targets Server, URLs are built from the
   collection root the host reports instead of `dev.azure.com`, and REST calls drop to the highest API version
