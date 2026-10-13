@@ -18,6 +18,7 @@ import {
 } from "azure-devops-extension-api/Git";
 import { PolicyEvaluationRecord, PolicyRestClient } from "azure-devops-extension-api/Policy";
 import { AsyncCache, mapLimit, pagedFetch, withRetry } from "./concurrency";
+import { apiFetch, negotiateApiVersion } from "./host";
 import { RawPullRequest, toPrInfo } from "./mapping";
 import { detectStacks } from "../stack/detect";
 import { PrInfo, StackForest } from "../stack/types";
@@ -72,8 +73,8 @@ export interface LayerRange {
 }
 
 export class StackedPrService {
-  private readonly git = getClient(GitRestClient);
-  private readonly policy = getClient(PolicyRestClient);
+  private readonly git = negotiateApiVersion(getClient(GitRestClient));
+  private readonly policy = negotiateApiVersion(getClient(PolicyRestClient));
   private readonly commitCache = new AsyncCache<Set<string>>();
   private readonly fileCache = new AsyncCache<string>();
   private readonly mergeBaseCache = new AsyncCache<string>();
@@ -370,11 +371,8 @@ export class StackedPrService {
   }
 
   private async fetchCommitsPage(repoId: string, id: number, continuationToken: string): Promise<{ value: GitCommitRef[]; continuationToken: string | null }> {
-    const accessToken = await SDK.getAccessToken();
-    const org = SDK.getHost().name;
-    const url = `https://dev.azure.com/${org}/${encodeURIComponent(this.ctx.projectName)}/_apis/git/repositories/${repoId}/pullRequests/${id}/commits?api-version=7.1&continuationToken=${encodeURIComponent(continuationToken)}`;
-    const res = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-    if (!res.ok) throw Object.assign(new Error(`Loading commits failed (${res.status})`), { status: res.status });
+    const path = `${encodeURIComponent(this.ctx.projectName)}/_apis/git/repositories/${repoId}/pullRequests/${id}/commits?continuationToken=${encodeURIComponent(continuationToken)}`;
+    const res = await apiFetch(path, "7.0");
     const body = await res.json();
     return { value: (body.value ?? []) as GitCommitRef[], continuationToken: res.headers.get("x-ms-continuationtoken") };
   }
@@ -455,20 +453,18 @@ export class StackedPrService {
   /** Identity search for the reviewer picker (Identity Picker REST API, needs the vso.identity scope). */
   async searchIdentities(query: string): Promise<{ id: string; displayName: string; mail?: string }[]> {
     if (query.trim().length < 2) return [];
-    const token = await SDK.getAccessToken();
-    const org = SDK.getHost().name;
-    const res = await fetch(`https://dev.azure.com/${org}/_apis/IdentityPicker/Identities?api-version=7.1-preview.1`, {
+    const res = await apiFetch("_apis/IdentityPicker/Identities", "7.0-preview.1", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         query,
         identityTypes: ["user", "group"],
-        operationScopes: ["ims", "source"],
+        // Azure DevOps Server collections backed by Active Directory also need the "ad" scope.
+        operationScopes: SDK.getHost().isHosted ? ["ims", "source"] : ["ims", "source", "ad"],
         options: { MinResults: 5, MaxResults: 8 },
         properties: ["DisplayName", "Mail", "LocalId"]
       })
     });
-    if (!res.ok) throw new Error(`Identity search failed (${res.status})`);
     const body = await res.json();
     const found = (body.results?.[0]?.identities ?? []) as { localId?: string; entityId?: string; displayName: string; mail?: string }[];
     return found.filter((i) => i.localId).map((i) => ({ id: i.localId!, displayName: i.displayName, mail: i.mail }));

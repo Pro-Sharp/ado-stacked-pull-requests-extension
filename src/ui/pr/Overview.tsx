@@ -121,7 +121,7 @@ export function Overview({ pr, raw, iterations, threads, statuses, policies, onC
                 <span className={`dot ${s.dot}`} />
                 <div className="name">{buildName ? `${name}: ${buildName}` : name}<div className="sp-muted" style={{ fontSize: 11 }}>{s.label}</div></div>
                 {(p.status === 3 || p.status === 5 || p.status === 2) && (
-                  <button className="sp-btn subtle" onClick={async () => { await service.requeuePolicy(p.evaluationId); onChanged(); }}>Queue</button>
+                  <button className="sp-btn subtle" onClick={async () => { await service.requeuePolicy(p.evaluationId).catch(() => undefined); onChanged(); }}>Queue</button>
                 )}
               </div>
             );

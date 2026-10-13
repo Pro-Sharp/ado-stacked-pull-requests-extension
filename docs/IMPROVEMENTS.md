@@ -80,7 +80,6 @@ Impact and effort are rough: S is a day or less, M a few days, L a week or more.
 | **Pre-merge checklist**: conflicts, policies, unresolved threads, parent state, one panel before Complete | Fewer failed completions | Med | S |
 | **AI assist (opt-in)**: summarise a layer, suggest review order, draft descriptions. Keep it advisory and show what is sent | StackPilot and Copilot show demand | Med | L |
 | **Deep links**: stable URLs to a file, line and thread inside the stacked view, openable from the native page | Sharing review context | Low | S |
-| **Azure DevOps Server (on-prem) support**: the identity search and commit paging assume `dev.azure.com`; derive the base URL from the SDK instead | Broader audience | Med | S |
 
 ### Tier 4 - quality, performance and trust
 

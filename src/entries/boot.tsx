@@ -2,6 +2,7 @@ import * as React from "react";
 import * as ReactDOM from "react-dom";
 import * as SDK from "azure-devops-extension-sdk";
 import { IHostNavigationService } from "azure-devops-extension-api";
+import { collectionUrl } from "../core/api/host";
 import { StackedPrService } from "../core/api/services";
 import { NavContext, Navigator, ServiceContext } from "../ui/context";
 import { buildRoute, nativePrUrl, projectBaseUrl, Route } from "../ui/route";
@@ -21,7 +22,7 @@ export async function boot(render: (ctx: { service: StackedPrService; navigator:
     watchTheme();
     const service = await StackedPrService.create();
     const host = await navigationService();
-    const base = projectBaseUrl(SDK.getHost().name, service.ctx.projectName);
+    const base = projectBaseUrl(await collectionUrl(), service.ctx.projectName);
 
     const navigator: Navigator = {
       openPr: (repoId, prId) => goto(host, base, { kind: "pr", repoId, prId }),

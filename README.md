@@ -92,9 +92,18 @@ When several pull requests qualify, the closest one wins, so `A ⊂ A2 ⊂ B` be
 2. Choose **Get it free** and pick your Azure DevOps organization.
 3. Open **Repos → Pull Requests (Stacked)**.
 
-It works with **Azure DevOps Services** (cloud). There is no backend: the extension talks only to your own
-organization, using the permissions it asks for (`vso.code_write`, `vso.code_status`, `vso.build`, `vso.work`,
+It works with **Azure DevOps Services** (cloud) and **Azure DevOps Server 2022 or later** (on-prem). There is no
+backend: the extension talks only to your own organization or collection, using the permissions it asks for (`vso.code_write`, `vso.code_status`, `vso.build`, `vso.work`,
 `vso.identity`, `vso.graph`, `vso.extension.data_write`).
+
+### Azure DevOps Server
+
+- **Connected servers**: install from the Marketplace through **Collection Settings → Extensions → Browse Marketplace**.
+- **Offline servers**: download the `.vsix` from the Marketplace page (or build it with `npm run package`), then go to
+  **Collection Settings → Extensions → Browse local extensions → Manage extensions → Upload extension** and install it
+  into the collection.
+
+The extension finds the collection URL from the host and adapts to the REST API version the server supports.
 
 Prefer to build it yourself? See [Development](docs/DEVELOPMENT.md#publishing).
 

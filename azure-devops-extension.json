@@ -8,8 +8,11 @@
   "description": "Review stacked pull requests layer by layer: a hierarchy of dependent PRs across all repositories, with a branch-only diff, and full review features.",
   "categories": ["Azure Repos"],
   "tags": ["pull request", "stacked", "review", "code review"],
-  "targets": [{ "id": "Microsoft.VisualStudio.Services.Cloud" }],
-  "demands": ["api-version/7.1"],
+  "targets": [
+    { "id": "Microsoft.VisualStudio.Services.Cloud" },
+    { "id": "Microsoft.TeamFoundation.Server", "version": "[19.0,)" }
+  ],
+  "demands": ["api-version/7.0"],
   "icons": { "default": "static/icon.png" },
   "scopes": [
     "vso.code_write",
