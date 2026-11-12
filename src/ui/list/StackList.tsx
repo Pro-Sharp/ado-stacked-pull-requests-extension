@@ -3,9 +3,9 @@ import { GitPullRequest } from "azure-devops-extension-api/Git";
 import { shortRef } from "../../core/api/mapping";
 import { StackSnapshot } from "../../core/api/services";
 import { stackCount, filterForest, ListTab, tabCounts } from "./filter";
-import { Avatar, ErrorBanner, HealthPill, Menu, MoreSentinel, Reviewers, Spinner, useAsync, useIncremental } from "../common/components";
+import { Avatar, ErrorBanner, HealthPill, Menu, MoreSentinel, Reviewers, RouteLink, Spinner, useAsync, useIncremental } from "../common/components";
 import { timeAgo } from "../common/format";
-import { useNav, useService } from "../context";
+import { useService } from "../context";
 import { mapLimit } from "../../core/api/concurrency";
 import { countResolved } from "../../core/diff/threads";
 
@@ -36,7 +36,6 @@ const TABS: { id: ListTab; label: string }[] = [
 
 export function StackList() {
   const service = useService();
-  const nav = useNav();
   const [prefs, setPrefs] = React.useState<Prefs>(loadPrefs);
   const [search, setSearch] = React.useState("");
   const [progress, setProgress] = React.useState<[number, number]>([0, 0]);
@@ -149,9 +148,9 @@ export function StackList() {
                       <div className="tree-cell" style={{ paddingLeft: node.depth * 22 }}>
                         {node.depth > 0 && <span className="guide">└</span>}
                         <div>
-                          <a className="title" onClick={() => nav.openPr(pr.repositoryId, pr.id)}>
+                          <RouteLink className="title" route={{ kind: "pr", repoId: pr.repositoryId, prId: pr.id }}>
                             {pr.title}
-                          </a>
+                          </RouteLink>
                           {pr.isDraft && <span className="sp-pill" style={{ marginLeft: 8 }}>Draft</span>}
                           {pr.status === "completed" && <span className="sp-pill muted" style={{ marginLeft: 8 }}>Completed</span>}
                           <div className="sub">

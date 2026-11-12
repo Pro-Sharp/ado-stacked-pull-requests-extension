@@ -22,6 +22,7 @@ function App() {
   const nav = {
     openPr: (repoId: string, prId: number) => { location.hash = buildRoute({ kind: "pr", repoId, prId }); },
     openList: () => { location.hash = buildRoute({ kind: "list" }); },
+    href: (r: Route) => buildRoute(r),
     nativeUrl: (repo: string, id: number) => `https://dev.azure.com/org/proj/_git/${repo}/pullrequest/${id}`,
     workItemUrl: (id: string) => `https://dev.azure.com/org/proj/_workitems/edit/${id}`
   };

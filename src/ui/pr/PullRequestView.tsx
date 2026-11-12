@@ -2,7 +2,7 @@ import * as React from "react";
 import { shortRef } from "../../core/api/mapping";
 import { countResolved } from "../../core/diff/threads";
 import { PrInfo } from "../../core/stack/types";
-import { Avatar, ErrorBanner, HealthPill, Menu, Spinner, useAsync } from "../common/components";
+import { Avatar, ErrorBanner, HealthPill, Menu, RouteLink, Spinner, useAsync } from "../common/components";
 import { useNav, useService } from "../context";
 import { CompleteDialog, VoteButton } from "./Actions";
 import { DiffMode, FilesView } from "./Files";
@@ -117,7 +117,7 @@ export function PullRequestView({ repoId, prId, embedded, initialTab = "overview
         {stack.loading && mode === undefined ? (
           <Spinner text="Detecting the stack to pick the default diff..." />
         ) : (
-          <FilesView pr={pr} parent={parent} iterations={d.iterations} threads={d.threads} mode={activeMode} onModeChange={setMode} onChanged={reload} nativeFilesUrl={`${nativeUrl}?_a=files`} />
+          <FilesView pr={pr} parent={parent} iterations={d.iterations} threads={d.threads} mode={activeMode} onModeChange={setMode} onChanged={reload} nativeFilesUrl={`${nativeUrl}?_a=files`} contained />
         )}
       </div>
     );
@@ -127,7 +127,7 @@ export function PullRequestView({ repoId, prId, embedded, initialTab = "overview
     <div className="sp-app">
       {!embedded && (
         <div style={{ marginBottom: 8 }}>
-          <a onClick={() => nav.openList()} style={{ cursor: "pointer", fontSize: 12 }}>← All stacked pull requests</a>
+          <RouteLink route={{ kind: "list" }} style={{ fontSize: 12 }}>← All stacked pull requests</RouteLink>
         </div>
       )}
       <div className="sp-pr-header">
@@ -157,7 +157,7 @@ export function PullRequestView({ repoId, prId, embedded, initialTab = "overview
           <Menu trigger={(toggle) => <button className="sp-btn subtle" onClick={toggle} aria-label="More actions">⋮</button>}>
             {(close) => (
               <div>
-                <button onClick={() => { close(); window.open(nativeUrl, "_blank"); }}>Open in Azure DevOps</button>
+                <a href={nativeUrl} target="_blank" rel="noreferrer" onClick={close}>Open in Azure DevOps</a>
                 <hr />
                 {pr.status === "active" && !pr.isDraft && <button onClick={() => { close(); guard(() => service.updatePullRequest(pr, { isDraft: true })); }}>Mark as draft</button>}
                 {pr.status === "active" && <button onClick={() => { close(); if (window.confirm("Abandon this pull request?")) guard(() => service.updatePullRequest(pr, { status: 2 })); }}>Abandon</button>}
@@ -173,7 +173,7 @@ export function PullRequestView({ repoId, prId, embedded, initialTab = "overview
       <ErrorBanner error={actionError} />
       <div className="sp-tabs" style={{ marginTop: 10 }}>
         {([["overview", "Overview"], ["files", "Files"], ["updates", "Updates"], ["commits", "Commits"]] as [PrTab, string][]).map(([id, label]) => (
-          <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>{label}</button>
+          <RouteLink key={id} className={tab === id ? "active" : ""} route={{ kind: "pr", repoId, prId, tab: id }} onNavigate={() => setTab(id)}>{label}</RouteLink>
         ))}
       </div>
 

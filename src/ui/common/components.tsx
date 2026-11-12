@@ -4,6 +4,8 @@ import { marked } from "marked";
 import { StackHealth } from "../../core/stack/types";
 import { voteKind, VoteKind, voteLabel } from "../../core/api/mapping";
 import { initials } from "./format";
+import { useNav } from "../context";
+import { Route } from "../route";
 
 export function Avatar({ name, url, size = 20 }: { name?: string; url?: string; size?: number }) {
   return (
@@ -46,6 +48,28 @@ export function Menu({ trigger, children }: { trigger: (toggle: () => void, open
       {open && <div className="sp-menu">{children(() => setOpen(false))}</div>}
     </span>
   );
+}
+
+/**
+ * Anchor for an in-app route: a plain left click navigates in place, while middle click, ctrl/cmd/shift+click
+ * and the context menu's "Open in new tab" use the real URL like any other link.
+ */
+export function RouteLink({ route, onNavigate, children, ...rest }: {
+  route: Route;
+  /** Replaces the default in-place navigation, e.g. to switch a tab without reloading the view. */
+  onNavigate?: () => void;
+  children: React.ReactNode;
+} & Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "onClick">) {
+  const nav = useNav();
+  const onClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    if (onNavigate) onNavigate();
+    else if (route.kind === "pr") nav.openPr(route.repoId, route.prId);
+    else nav.openList();
+  };
+  // `_top`: the extension runs in an iframe, so a link that does escape the click handler must not load the host page inside it.
+  return <a {...rest} href={nav.href(route)} target="_top" onClick={onClick}>{children}</a>;
 }
 
 const marks: Record<VoteKind, { cls: string; glyph: string } | undefined> = {

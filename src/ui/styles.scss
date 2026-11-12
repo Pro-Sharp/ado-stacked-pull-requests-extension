@@ -17,6 +17,7 @@
   --sp-warn: #c19c00;
   --sp-danger: #c50f1f;
   --sp-shadow: 0 1.6px 3.6px rgba(0, 0, 0, 0.13), 0 0.3px 0.9px rgba(0, 0, 0, 0.1);
+  --sp-active-bg: rgba(0, 120, 212, 0.1);
 }
 
 // The palette follows the host theme (see ui/theme.ts), which can differ from the OS setting.
@@ -27,6 +28,7 @@
   --sp-text-2: var(--text-secondary-color, rgba(255, 255, 255, 0.6));
   --sp-border: rgba(255, 255, 255, 0.12);
   --sp-hover: rgba(255, 255, 255, 0.08);
+  --sp-active-bg: rgba(71, 158, 245, 0.16);
   --sp-add-bg: #1e3a1e;
   --sp-add-num: #264a26;
   --sp-del-bg: #3d2020;
@@ -146,7 +148,8 @@ button {
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
   border-radius: 2px;
   padding: 4px 0;
-  button {
+  button,
+  a {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -155,6 +158,9 @@ button {
     border: 0;
     text-align: left;
     padding: 7px 14px;
+    box-sizing: border-box;
+    color: var(--sp-text);
+    text-decoration: none;
     &:hover:not(:disabled) {
       background: var(--sp-hover);
     }
@@ -292,13 +298,15 @@ button {
   gap: 18px;
   border-bottom: 1px solid var(--sp-border);
   margin: 6px 0 14px;
-  button {
+  button,
+  a {
     background: none;
     border: 0;
     padding: 6px 0 8px;
     font-size: 13px;
     border-bottom: 2px solid transparent;
     color: var(--sp-text);
+    text-decoration: none;
     &:hover {
       color: var(--sp-link);
     }
@@ -747,12 +755,15 @@ button {
   min-height: 400px;
   box-shadow: var(--sp-shadow);
   .tree {
-    border-right: 1px solid var(--sp-border);
     padding: 8px 0;
     overflow: auto;
-    max-height: calc(100vh - 220px);
+    // Follows the page as the diffs scroll: pinned to the top of the viewport and never taller than it,
+    // and `start` so it is not stretched to the full grid row (a stretched sticky item has nowhere to move).
+    align-self: start;
     position: sticky;
     top: 0;
+    max-height: 100vh;
+    box-sizing: border-box;
     .node {
       display: flex;
       align-items: center;
@@ -760,12 +771,23 @@ button {
       padding: 3px 8px;
       cursor: pointer;
       white-space: nowrap;
+      border-left: 3px solid transparent;
       &:hover {
         background: var(--sp-hover);
       }
       &.sel {
         background: var(--sp-hover);
         font-weight: 600;
+      }
+      // The diff currently being read, and a collapsed folder that hides it.
+      &.active {
+        border-left-color: var(--sp-primary);
+        background: var(--sp-active-bg);
+        color: var(--sp-link);
+        font-weight: 600;
+      }
+      &.has-active {
+        border-left-color: var(--sp-primary);
       }
       .cnt {
         margin-left: auto;
@@ -796,6 +818,19 @@ button {
     min-width: 0;
     padding: 12px;
     overflow: auto;
+    // The divider lives here, not on the tree: the tree is only as tall as its content.
+    border-left: 1px solid var(--sp-border);
+  }
+  &.contained {
+    .tree,
+    .viewer {
+      position: static;
+      align-self: stretch;
+      max-height: none;
+      height: 100%;
+      overflow: auto;
+      box-sizing: border-box;
+    }
   }
 }
 

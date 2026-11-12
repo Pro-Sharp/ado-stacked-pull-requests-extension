@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Fixed: pull request links in the list, the stack map, the PR tabs and "All stacked pull requests" are real links again, so middle click, ctrl+click and "Open in new tab" work
+- Fixed: the file tree on the Files tab stayed at the top of the page while the diffs scrolled (on the Stack tab of the native PR page the tree and diffs now scroll side by side)
+- The file tree highlights the diff currently in view and scrolls to keep it visible
+
 ## 0.3.0
 
 - The hub, the Stack tab and the "Open stacked review" action are now behind a native Azure DevOps preview feature,

@@ -2,13 +2,12 @@ import * as React from "react";
 import { shortRef } from "../../core/api/mapping";
 import { stackRows } from "../../core/stack/render";
 import { StackForest, StackNode } from "../../core/stack/types";
-import { HealthPill } from "../common/components";
-import { useNav, useService } from "../context";
+import { HealthPill, RouteLink } from "../common/components";
+import { useService } from "../context";
 import { PrInfo } from "../../core/stack/types";
 
 /** The chain of PRs this PR is part of, shown above the tabs like a "stack map". */
 export function StackMap({ forest, currentId, onChanged }: { forest: StackForest; currentId: number; onChanged: () => void }) {
-  const nav = useNav();
   const service = useService();
   const current = forest.nodes.get(currentId);
   if (!current) return null;
@@ -28,9 +27,9 @@ export function StackMap({ forest, currentId, onChanged }: { forest: StackForest
       {rows.map(({ node, prefix }) => (
         <div className={`node ${node.pr.id === currentId ? "current" : ""}`} key={node.pr.id}>
           <span className="guide">{prefix}</span>
-          <a onClick={() => nav.openPr(node.pr.repositoryId, node.pr.id)} className="t" title={node.pr.title}>
+          <RouteLink route={{ kind: "pr", repoId: node.pr.repositoryId, prId: node.pr.id }} className="t" title={node.pr.title}>
             !{node.pr.id} {node.pr.title}
-          </a>
+          </RouteLink>
           {node.pr.status === "completed" && <span className="sp-pill muted">Completed</span>}
           {node.pr.isDraft && <span className="sp-pill">Draft</span>}
           <HealthPill health={node.health} conflicts={node.hasConflicts} />

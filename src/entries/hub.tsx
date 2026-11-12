@@ -18,4 +18,4 @@ function Hub({ host }: { host: IHostNavigationService }) {
   return <StackList />;
 }
 
-boot(({ host }) => <Hub host={host} />);
+boot(({ host }) => <Hub host={host} />, true);

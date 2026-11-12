@@ -1,9 +1,12 @@
 import * as React from "react";
 import { StackedPrService } from "../core/api/services";
+import { Route } from "./route";
 
 export interface Navigator {
   openPr(repoId: string, prId: number): void;
   openList(): void;
+  /** Real URL of a route, so in-app links support middle click, ctrl+click and "Open in new tab". */
+  href(route: Route): string;
   /** URL of the native PR page, for "Open in Azure DevOps" links. */
   nativeUrl(repoName: string, prId: number): string;
   workItemUrl(id: string): string;

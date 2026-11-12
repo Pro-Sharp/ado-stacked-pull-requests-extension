@@ -5,7 +5,8 @@ import { IHostNavigationService } from "azure-devops-extension-api";
 import { collectionUrl } from "../core/api/host";
 import { StackedPrService } from "../core/api/services";
 import { NavContext, Navigator, ServiceContext } from "../ui/context";
-import { buildRoute, nativePrUrl, projectBaseUrl, Route } from "../ui/route";
+import { buildRoute, hubUrl, nativePrUrl, projectBaseUrl, Route } from "../ui/route";
+import { HUB_CONTRIBUTION } from "./constants";
 import { watchTheme } from "../ui/theme";
 import "../ui/styles.scss";
 
@@ -14,8 +15,11 @@ export async function navigationService(): Promise<IHostNavigationService> {
   return SDK.getService<IHostNavigationService>("ms.vss-features.host-navigation-service");
 }
 
-/** Initialises the SDK, the REST service and renders `render` once the host handshake is done. */
-export async function boot(render: (ctx: { service: StackedPrService; navigator: Navigator; host: IHostNavigationService }) => React.ReactElement): Promise<void> {
+/**
+ * Initialises the SDK, the REST service and renders `render` once the host handshake is done.
+ * `inHub` is true for the hub itself, where routes are hash changes; elsewhere (the PR tab) they open the hub.
+ */
+export async function boot(render: (ctx: { service: StackedPrService; navigator: Navigator; host: IHostNavigationService }) => React.ReactElement, inHub = false): Promise<void> {
   await SDK.init({ loaded: false, applyTheme: true });
   try {
     await SDK.ready();
@@ -23,10 +27,15 @@ export async function boot(render: (ctx: { service: StackedPrService; navigator:
     const service = await StackedPrService.create();
     const host = await navigationService();
     const base = projectBaseUrl(await collectionUrl(), service.ctx.projectName);
+    const ext = SDK.getExtensionContext();
+    const href = (route: Route) => hubUrl(base, ext.publisherId, ext.extensionId, HUB_CONTRIBUTION, route);
+    // Inside the hub a route is a hash change, so deep links and the back button work; elsewhere the host page navigates to the hub.
+    const goto = (route: Route) => (inHub ? host.setHash(buildRoute(route)) : host.navigate(href(route)));
 
     const navigator: Navigator = {
-      openPr: (repoId, prId) => goto(host, base, { kind: "pr", repoId, prId }),
-      openList: () => goto(host, base, { kind: "list" }),
+      openPr: (repoId, prId) => goto({ kind: "pr", repoId, prId }),
+      openList: () => goto({ kind: "list" }),
+      href,
       nativeUrl: (repoName, prId) => nativePrUrl(base, repoName, prId),
       workItemUrl: (id) => `${base}/_workitems/edit/${id}`
     };
@@ -44,9 +53,4 @@ export async function boot(render: (ctx: { service: StackedPrService; navigator:
     document.getElementById("root")!.innerHTML = `<div class="sp-error" style="margin:16px">Failed to start: ${msg.replace(/</g, "&lt;")}</div>`;
     SDK.notifyLoadFailed(msg);
   }
-}
-
-/** Navigation inside the hub changes the URL hash, so deep links and the back button work. */
-function goto(host: IHostNavigationService, _base: string, route: Route): void {
-  host.setHash(buildRoute(route));
 }

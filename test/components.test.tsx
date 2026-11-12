@@ -4,7 +4,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { detectStacks } from "../src/core/stack/detect";
 import { PrInfo } from "../src/core/stack/types";
-import { Avatar, HealthPill, Markdown, Reviewers } from "../src/ui/common/components";
+import * as ReactDOM from "react-dom";
+import { Avatar, HealthPill, Markdown, Reviewers, RouteLink } from "../src/ui/common/components";
+import { buildRoute } from "../src/ui/route";
 import { NavContext, ServiceContext } from "../src/ui/context";
 import { StackMap } from "../src/ui/pr/StackMap";
 
@@ -39,6 +41,33 @@ describe("common components", () => {
   });
 });
 
+describe("RouteLink", () => {
+  const setup = () => {
+    const calls: string[] = [];
+    const nav = { openPr: (r: string, id: number) => calls.push(`pr ${r} ${id}`), openList: () => calls.push("list"), href: (r: never) => `https://host/hub${buildRoute(r)}`, nativeUrl: () => "", workItemUrl: () => "" };
+    const host = document.body.appendChild(document.createElement("div"));
+    ReactDOM.render(<NavContext.Provider value={nav}><RouteLink route={{ kind: "pr", repoId: "r", prId: 5 }}>go</RouteLink></NavContext.Provider>, host);
+    return { calls, a: host.querySelector("a")! };
+  };
+
+  it("is a real link, so middle click and open in new tab work", () => {
+    const { a } = setup();
+    expect(a.getAttribute("href")).toBe("https://host/hub#/pr/r/5");
+    expect(a.target).toBe("_top");
+  });
+
+  it("navigates in place on a plain click and leaves modified clicks to the browser", () => {
+    const { calls, a } = setup();
+    const plain = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
+    a.dispatchEvent(plain);
+    expect(plain.defaultPrevented).toBe(true);
+    const ctrl = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0, ctrlKey: true });
+    a.dispatchEvent(ctrl);
+    expect(ctrl.defaultPrevented).toBe(false);
+    expect(calls).toEqual(["pr r 5"]);
+  });
+});
+
 describe("StackMap", () => {
   const mk = (id: number, head: string): PrInfo => ({
     id, repositoryId: "r", repositoryName: "Repo", title: `Title ${id}`, isDraft: false, status: "active",
@@ -46,7 +75,7 @@ describe("StackMap", () => {
   });
   const prs = [mk(1, "a"), mk(2, "b"), mk(3, "c")];
   const forest = detectStacks(prs, { commitsByPr: new Map([[1, new Set(["a"])], [2, new Set(["a", "b"])], [3, new Set(["a", "b", "c"])]]) });
-  const nav = { openPr() {}, openList() {}, nativeUrl: () => "", workItemUrl: () => "" };
+  const nav = { openPr() {}, openList() {}, href: () => "#", nativeUrl: () => "", workItemUrl: () => "" };
   const render = (id: number) =>
     renderToStaticMarkup(
       <ServiceContext.Provider value={{ ctx: { userId: "me" } } as never}>

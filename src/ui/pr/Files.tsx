@@ -24,6 +24,11 @@ interface Props {
   onModeChange: (m: DiffMode) => void;
   onChanged: () => void;
   nativeFilesUrl: string;
+  /**
+   * The page does not scroll our document (the PR tab iframe grows to fit its content), so a sticky tree cannot follow:
+   * tree and diffs get a fixed height and scroll on their own instead.
+   */
+  contained?: boolean;
 }
 
 type FileEntry = LayerFile & { changeTrackingId?: number };
@@ -39,7 +44,54 @@ interface FileSet {
 const MAX_ROWS = 4000;
 const ROW_STEP = 400;
 
-export function FilesView({ pr, parent, iterations, threads, mode, onModeChange, onChanged, nativeFilesUrl }: Props) {
+/** Height of the contained layout; the host viewport is not visible from the iframe, so the screen is the best estimate. */
+function containedHeight(): number {
+  return Math.max(480, (window.screen?.availHeight || 900) - 320);
+}
+
+/**
+ * Path of the diff that is currently at the top of the visible area of `viewer`, updated on any scroll.
+ * Works for both layouts: the viewer scrolling itself, or the whole document scrolling past it.
+ */
+function useFileInView(viewer: React.RefObject<HTMLElement>, version: unknown): string | undefined {
+  const [path, setPath] = React.useState<string>();
+  React.useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      const el = viewer.current;
+      if (!el) return;
+      const files = Array.from(el.querySelectorAll<HTMLElement>(".sp-diff-file[data-path]"));
+      if (!files.length) return setPath(undefined);
+      const box = el.getBoundingClientRect();
+      const visibleTop = Math.max(box.top, 0) + 48;
+      const scroller = el.scrollHeight > el.clientHeight + 1 ? el : document.scrollingElement;
+      // At the very bottom the last diffs may never reach the top edge; the last one is the one being read.
+      const atBottom = !!scroller && scroller.scrollTop > 0 && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
+      let current = files[0];
+      if (atBottom) current = files[files.length - 1];
+      else for (const f of files) {
+        if (f.getBoundingClientRect().top > visibleTop) break;
+        current = f;
+      }
+      setPath(current.dataset.path);
+    };
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+    update();
+    document.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onScroll);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [viewer, version]);
+  return path;
+}
+
+export function FilesView({ pr, parent, iterations, threads, mode, onModeChange, onChanged, nativeFilesUrl, contained }: Props) {
   const service = useService();
   const latest = iterations[iterations.length - 1];
   const headSha = latest?.sourceRefCommit?.commitId ?? pr.headSha;
@@ -100,6 +152,20 @@ export function FilesView({ pr, parent, iterations, threads, mode, onModeChange,
   // Infinite scroll over the diffs: only the first files are mounted (and fetch their content); more follow on scroll.
   const paging = useIncremental(shown.length, 8, `${selected}|${filter}|${mode}|${parent?.id}|${pr.id}`);
 
+  const treeRef = React.useRef<HTMLDivElement>(null);
+  const viewerRef = React.useRef<HTMLDivElement>(null);
+  const inView = useFileInView(viewerRef, `${shown.length}|${paging.limit}|${!!fileSet.data}`);
+  // Keep the highlighted file visible in a long tree.
+  React.useEffect(() => {
+    const tree = treeRef.current;
+    const node = inView && tree ? tree.querySelector<HTMLElement>(`[data-path="${CSS.escape(inView)}"]`) : null;
+    if (!tree || !node) return;
+    const t = tree.getBoundingClientRect();
+    const n = node.getBoundingClientRect();
+    if (n.top < t.top) tree.scrollTop -= t.top - n.top + 24;
+    else if (n.bottom > t.bottom) tree.scrollTop += n.bottom - t.bottom + 24;
+  }, [inView]);
+
   return (
     <div>
       <div className="sp-filebar">
@@ -134,19 +200,22 @@ export function FilesView({ pr, parent, iterations, threads, mode, onModeChange,
       {fileSet.loading && <Spinner text={fileSet.data?.files.length ? `Loaded ${fileSet.data.files.length} changed files, loading more...` : "Loading..."} />}
 
       {fileSet.data && (
-        <div className="sp-files">
-          <div className="tree" role="tree">
+        <div className={`sp-files ${contained ? "contained" : ""}`} style={contained ? { height: containedHeight() } : undefined}>
+          <div className="tree" role="tree" ref={treeRef}>
             <div className={`node ${!selected ? "sel" : ""}`} onClick={() => setSelected(undefined)}>
               <strong>{pr.repositoryName}</strong>
             </div>
             {tree.map(({ node, depth }) => {
               const isFile = !!node.file;
               const count = isFile ? (buckets.byFile.get(node.path)?.length ?? 0) : 0;
+              const active = isFile ? node.file!.path === inView : collapsed.has(node.path) && !!inView?.startsWith(node.path + "/");
               return (
                 <div
                   key={node.path}
                   role="treeitem"
-                  className={`node ${selected === node.path ? "sel" : ""}`}
+                  aria-current={isFile && active ? "location" : undefined}
+                  data-path={isFile ? node.file!.path : undefined}
+                  className={`node ${selected === node.path ? "sel" : ""} ${active ? (isFile ? "active" : "has-active") : ""}`}
                   style={{ paddingLeft: 8 + depth * 14 }}
                   onClick={() => {
                     if (isFile) setSelected(node.path);
@@ -161,7 +230,7 @@ export function FilesView({ pr, parent, iterations, threads, mode, onModeChange,
             })}
           </div>
 
-          <div className="viewer">
+          <div className="viewer" ref={viewerRef}>
             {mode === "layer" && buckets.inherited.length > 0 && (
               <div className="sp-card sp-inherited">
                 <div className="head" onClick={() => setShowInherited((s) => !s)}>
@@ -272,7 +341,7 @@ function DiffFile({ pr, file, set, iterationId, threads, onChanged }: {
   };
 
   return (
-    <div className="sp-diff-file">
+    <div className="sp-diff-file" data-path={file.path}>
       <div className="head">
         <span style={{ cursor: "pointer" }} onClick={() => setOpen((o) => !o)}>{open ? "▾" : "▸"}</span>
         <div>
