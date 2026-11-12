@@ -50,7 +50,8 @@ function containedHeight(): number {
 }
 
 /**
- * Path of the diff that is currently at the top of the visible area of `viewer`, updated on any scroll.
+ * Path of the diff that crosses the middle of the visible area of `viewer`, updated on any scroll.
+ * The middle (not the top) lets short files between two long ones get their turn.
  * Works for both layouts: the viewer scrolling itself, or the whole document scrolling past it.
  */
 function useFileInView(viewer: React.RefObject<HTMLElement>, version: unknown): string | undefined {
@@ -64,14 +65,17 @@ function useFileInView(viewer: React.RefObject<HTMLElement>, version: unknown): 
       const files = Array.from(el.querySelectorAll<HTMLElement>(".sp-diff-file[data-path]"));
       if (!files.length) return setPath(undefined);
       const box = el.getBoundingClientRect();
-      const visibleTop = Math.max(box.top, 0) + 48;
+      const top = Math.max(box.top, 0);
+      const bottom = Math.min(box.bottom, window.innerHeight);
+      const half = Math.max(0, bottom - top) / 2;
       const scroller = el.scrollHeight > el.clientHeight + 1 ? el : document.scrollingElement;
-      // At the very bottom the last diffs may never reach the top edge; the last one is the one being read.
-      const atBottom = !!scroller && scroller.scrollTop > 0 && scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
+      // Diffs near the end can never scroll up to the middle, so over the last half screen of scrolling
+      // the line slides down to the bottom edge and each of them still gets its turn.
+      const remaining = scroller ? scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight : half;
+      const line = top + half + Math.max(0, half - remaining);
       let current = files[0];
-      if (atBottom) current = files[files.length - 1];
-      else for (const f of files) {
-        if (f.getBoundingClientRect().top > visibleTop) break;
+      for (const f of files) {
+        if (f.getBoundingClientRect().top > line) break;
         current = f;
       }
       setPath(current.dataset.path);

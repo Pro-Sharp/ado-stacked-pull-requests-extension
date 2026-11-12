@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.2
+
+- The file tree highlights the diff that crosses the middle of the screen instead of the top, so short files between two long ones are no longer skipped
+
 ## 0.3.1
 
 - Fixed: pull request links in the list, the stack map, the PR tabs and "All stacked pull requests" are real links again, so middle click, ctrl+click and "Open in new tab" work
