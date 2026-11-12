@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.3
+
+- Fixed: the diffs on the Files tab follow the same order as the file tree (folders before files at every level)
+
 ## 0.3.2
 
 - The file tree highlights the diff that crosses the middle of the screen instead of the top, so short files between two long ones are no longer skipped

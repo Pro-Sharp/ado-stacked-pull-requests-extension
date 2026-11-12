@@ -9,7 +9,7 @@ import { PrInfo } from "../../core/stack/types";
 import { ErrorBanner, MoreSentinel, Spinner, useAsync, useIncremental } from "../common/components";
 import { dirName, fileName } from "../common/format";
 import { useService } from "../context";
-import { buildTree, changeLetter, flattenTree } from "./tree";
+import { buildTree, changeLetter, flattenTree, treeOrder } from "./tree";
 import { Composer, ThreadView } from "./Threads";
 
 export type DiffMode = "layer" | "all";
@@ -149,7 +149,7 @@ export function FilesView({ pr, parent, iterations, threads, mode, onModeChange,
   const [filter, setFilter] = React.useState("");
   const [showInherited, setShowInherited] = React.useState(false);
 
-  const files = React.useMemo(() => (fileSet.data?.files ?? []).filter((f) => f.path.toLowerCase().includes(filter.toLowerCase())), [fileSet.data, filter]);
+  const files = React.useMemo(() => treeOrder((fileSet.data?.files ?? []).filter((f) => f.path.toLowerCase().includes(filter.toLowerCase()))), [fileSet.data, filter]);
   const buckets = React.useMemo(() => bucketThreads(threads, new Set((fileSet.data?.files ?? []).map((f) => f.path))), [threads, fileSet.data]);
   const tree = React.useMemo(() => flattenTree(buildTree(files), collapsed), [files, collapsed]);
   const shown = selected ? files.filter((f) => f.path === selected) : files;

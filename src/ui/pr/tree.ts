@@ -45,6 +45,19 @@ export function flattenTree<T extends TreeFile>(nodes: TreeNode<T>[], collapsed:
   return out;
 }
 
+/** Files in the order the tree shows them (folders before files at every level), so diffs follow the tree. */
+export function treeOrder<T extends TreeFile>(files: T[]): T[] {
+  const out: T[] = [];
+  const walk = (nodes: TreeNode<T>[]) => {
+    for (const n of nodes) {
+      if (n.file) out.push(n.file);
+      else walk(n.children);
+    }
+  };
+  walk(buildTree(files));
+  return out;
+}
+
 /** Single-letter change marker used in the file tree: A(dd) / M(odify) / D(elete) / R(ename). */
 export function changeLetter(changeType: number): "A" | "M" | "D" | "R" {
   if (changeType & 16) return "D";
