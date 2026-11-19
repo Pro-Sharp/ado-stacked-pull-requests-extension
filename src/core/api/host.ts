@@ -117,7 +117,7 @@ export function negotiateApiVersion<T>(client: T): T {
 
 /** Raw `fetch` against the collection with the extension's access token and version negotiation. */
 export async function apiFetch(path: string, apiVersion: string, init: RequestInit = {}): Promise<Response> {
-  const base = await collectionUrl();
+  const base = /^https?:\/\//i.test(path) ? "" : await collectionUrl();
   return withApiVersion(apiVersion, async (version) => {
     const token = await SDK.getAccessToken();
     const url = `${base}${path}${path.includes("?") ? "&" : "?"}api-version=${version}`;

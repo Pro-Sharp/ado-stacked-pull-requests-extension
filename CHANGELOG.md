@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.4
+
+- Fixed: the reviewer search on the PR page works again (it uses the Identities API instead of the Identity Picker, which rejected the extension token)
+- Fixed: file diffs no longer fail with TF400813 when the text request is rejected as anonymous; the file content is then requested as JSON
+
 ## 0.3.3
 
 - Fixed: the diffs on the Files tab follow the same order as the file tree (folders before files at every level)

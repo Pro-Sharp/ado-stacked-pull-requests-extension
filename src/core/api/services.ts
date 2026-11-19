@@ -316,20 +316,18 @@ export class StackedPrService {
   getFileText(repoId: string, path: string, sha: string): Promise<string> {
     return this.fileCache.get(`${repoId}:${sha}:${path}`, async () => {
       try {
-        return await withRetry(() =>
-          this.git.getItemText(
-            repoId,
-            path,
-            this.ctx.projectName,
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            { version: sha, versionType: GitVersionType.Commit } as never,
-            true
-          )
-        );
+        const version = { version: sha, versionType: GitVersionType.Commit } as never;
+        try {
+          return await withRetry(() =>
+            this.git.getItemText(repoId, path, this.ctx.projectName, undefined, undefined, undefined, undefined, undefined, version, true)
+          );
+        } catch (e) {
+          const status = (e as { status?: number }).status;
+          if (status !== 401 && status !== 403) throw e;
+          // The text/plain Items request can be treated as anonymous; the JSON flavour carries the content too.
+          const item = await this.git.getItem(repoId, path, this.ctx.projectName, undefined, undefined, undefined, undefined, undefined, version, true);
+          return item?.content ?? "";
+        }
       } catch (e) {
         if ((e as { status?: number }).status === 404) return "";
         throw e;
@@ -453,21 +451,26 @@ export class StackedPrService {
   /** Identity search for the reviewer picker (Identity Picker REST API, needs the vso.identity scope). */
   async searchIdentities(query: string): Promise<{ id: string; displayName: string; mail?: string }[]> {
     if (query.trim().length < 2) return [];
-    const res = await apiFetch("_apis/IdentityPicker/Identities", "7.0-preview.1", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query,
-        identityTypes: ["user", "group"],
-        // Azure DevOps Server collections backed by Active Directory also need the "ad" scope.
-        operationScopes: SDK.getHost().isHosted ? ["ims", "source"] : ["ims", "source", "ad"],
-        options: { MinResults: 5, MaxResults: 8 },
-        properties: ["DisplayName", "Mail", "LocalId"]
-      })
-    });
+    // The Identity Picker endpoint rejects extension access tokens (401), so use the Identities API
+    // (vso.identity), which lives on vssps.dev.azure.com for the cloud and on the collection on-prem.
+    const host = SDK.getHost();
+    const root = host.isHosted ? `https://vssps.dev.azure.com/${encodeURIComponent(host.name)}/` : "";
+    const res = await apiFetch(
+      `${root}_apis/identities?searchFilter=General&filterValue=${encodeURIComponent(query)}&queryMembership=None`,
+      "7.0"
+    );
     const body = await res.json();
-    const found = (body.results?.[0]?.identities ?? []) as { localId?: string; entityId?: string; displayName: string; mail?: string }[];
-    return found.filter((i) => i.localId).map((i) => ({ id: i.localId!, displayName: i.displayName, mail: i.mail }));
+    const found = (body.value ?? []) as {
+      id: string;
+      isContainer?: boolean;
+      providerDisplayName?: string;
+      customDisplayName?: string;
+      properties?: { Mail?: { $value?: string } };
+    }[];
+    return found
+      .filter((i) => i.id)
+      .slice(0, 8)
+      .map((i) => ({ id: i.id, displayName: i.customDisplayName || i.providerDisplayName || i.id, mail: i.properties?.Mail?.$value }));
   }
 
   addLabel(pr: PrInfo, name: string) {
