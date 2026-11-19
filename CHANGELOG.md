@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.5
+
+- Fixed: the reviewer search finds people by the first letters of their name (it uses the Graph subject query in the cloud; the Identities API only matched full names)
+
 ## 0.3.4
 
 - Fixed: the reviewer search on the PR page works again (it uses the Identities API instead of the Identity Picker, which rejected the extension token)

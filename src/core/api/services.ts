@@ -451,18 +451,52 @@ export class StackedPrService {
   /** Identity search for the reviewer picker (Identity Picker REST API, needs the vso.identity scope). */
   async searchIdentities(query: string): Promise<{ id: string; displayName: string; mail?: string }[]> {
     if (query.trim().length < 2) return [];
-    // The Identity Picker endpoint rejects extension access tokens (401), so use the Identities API
-    // (vso.identity), which lives on vssps.dev.azure.com for the cloud and on the collection on-prem.
+    // The Identity Picker endpoint rejects extension access tokens (401). In the cloud the Graph
+    // subject query (vso.graph) does the prefix search the "Add reviewer" box needs; the Identities
+    // API (vso.identity) only matches whole names there, so it is the fallback and the on-prem route.
     const host = SDK.getHost();
-    const root = host.isHosted ? `https://vssps.dev.azure.com/${encodeURIComponent(host.name)}/` : "";
-    const res = await apiFetch(
-      `${root}_apis/identities?searchFilter=General&filterValue=${encodeURIComponent(query)}&queryMembership=None`,
-      "7.0"
+    if (host.isHosted) {
+      const root = `https://vssps.dev.azure.com/${encodeURIComponent(host.name)}/`;
+      try {
+        const found = await this.searchGraph(root, query);
+        if (found.length) return found;
+      } catch {
+        // Fall through to the Identities API.
+      }
+      return this.searchIdentitiesApi(root, query);
+    }
+    return this.searchIdentitiesApi("", query);
+  }
+
+  private async searchGraph(root: string, query: string): Promise<{ id: string; displayName: string; mail?: string }[]> {
+    const res = await apiFetch(`${root}_apis/graph/subjectquery`, "7.1-preview.1", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, subjectKind: ["User", "Group"] })
+    });
+    const body = await res.json();
+    const subjects = ((body.value ?? []) as { descriptor?: string; displayName?: string; mailAddress?: string }[])
+      .filter((s) => s.descriptor)
+      .slice(0, 8);
+    // Reviewers are referenced by their Azure DevOps identity id, which is the descriptor's storage key.
+    const resolved = await Promise.all(
+      subjects.map(async (s) => {
+        try {
+          const key = await (await apiFetch(`${root}_apis/graph/storagekeys/${encodeURIComponent(s.descriptor!)}`, "7.1-preview.1")).json();
+          return key?.value ? { id: String(key.value), displayName: s.displayName || String(key.value), mail: s.mailAddress } : undefined;
+        } catch {
+          return undefined;
+        }
+      })
     );
+    return resolved.filter((r): r is { id: string; displayName: string; mail: string | undefined } => !!r);
+  }
+
+  private async searchIdentitiesApi(root: string, query: string): Promise<{ id: string; displayName: string; mail?: string }[]> {
+    const res = await apiFetch(`${root}_apis/identities?searchFilter=General&filterValue=${encodeURIComponent(query)}&queryMembership=None`, "7.0");
     const body = await res.json();
     const found = (body.value ?? []) as {
       id: string;
-      isContainer?: boolean;
       providerDisplayName?: string;
       customDisplayName?: string;
       properties?: { Mail?: { $value?: string } };
