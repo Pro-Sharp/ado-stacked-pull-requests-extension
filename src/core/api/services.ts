@@ -18,7 +18,7 @@ import {
 } from "azure-devops-extension-api/Git";
 import { PolicyEvaluationRecord, PolicyRestClient } from "azure-devops-extension-api/Policy";
 import { AsyncCache, mapLimit, pagedFetch, withRetry } from "./concurrency";
-import { apiFetch, negotiateApiVersion } from "./host";
+import { apiFetch, authTokenProvider, negotiateApiVersion } from "./host";
 import { RawPullRequest, toPrInfo } from "./mapping";
 import { detectStacks } from "../stack/detect";
 import { PrInfo, StackForest } from "../stack/types";
@@ -73,8 +73,8 @@ export interface LayerRange {
 }
 
 export class StackedPrService {
-  private readonly git = negotiateApiVersion(getClient(GitRestClient));
-  private readonly policy = negotiateApiVersion(getClient(PolicyRestClient));
+  private readonly git = negotiateApiVersion(getClient(GitRestClient, { authTokenProvider }));
+  private readonly policy = negotiateApiVersion(getClient(PolicyRestClient, { authTokenProvider }));
   private readonly commitCache = new AsyncCache<Set<string>>();
   private readonly fileCache = new AsyncCache<string>();
   private readonly mergeBaseCache = new AsyncCache<string>();

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.6
+
+- Fixed: requests failing with TF400813 (unauthorized) after the page had been open for a while; the extension now asks the host for a new access token when the cached one has expired or is rejected
+
 ## 0.3.5
 
 - Fixed: the reviewer search finds people by the first letters of their name (it uses the Graph subject query in the cloud; the Identities API only matched full names)

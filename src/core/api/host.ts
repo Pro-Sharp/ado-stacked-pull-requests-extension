@@ -29,6 +29,50 @@ export function withTrailingSlash(url: string): string {
   return url.endsWith("/") ? url : `${url}/`;
 }
 
+// ---- Access token -----------------------------------------------------------------------------
+
+let lastToken: string | undefined;
+
+/** Expiry (ms) of the extension token: its `ado_exp` claim, which Azure DevOps enforces before the AAD `exp`. */
+function tokenExpiry(token: string): number | undefined {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    const attrs = Object.values(payload.xms_attr ?? {}) as { ado_exp?: number }[];
+    const exp = attrs.map((a) => a?.ado_exp).find((e): e is number => typeof e === "number") ?? payload.exp;
+    return typeof exp === "number" ? exp * 1000 : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * The host hands out a cached extension token that Azure DevOps stops accepting (as anonymous, TF400813)
+ * a few minutes before the host replaces it. With `rejected` the token that just got a 401 is asked for
+ * again until the host serves a different one that is still valid.
+ */
+export async function getFreshAccessToken(rejected = false): Promise<string> {
+  let token = await SDK.getAccessToken();
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    const exp = tokenExpiry(token);
+    const stale = (rejected && token === lastToken) || (exp !== undefined && exp < Date.now() + 15_000);
+    if (!stale) break;
+    await sleep(600 * attempt);
+    token = await SDK.getAccessToken();
+  }
+  lastToken = token;
+  return token;
+}
+
+/** Auth provider for the SDK REST clients (the default one never asks the host for a new token). */
+export const authTokenProvider = {
+  getAuthorizationHeader: async (refresh?: boolean): Promise<string> => {
+    const token = await getFreshAccessToken(!!refresh);
+    return token ? `Bearer ${token}` : "";
+  }
+};
+
 // ---- API version negotiation -----------------------------------------------------------------
 
 /** Highest API version the server reported, learned from the first out-of-range rejection. */
@@ -119,9 +163,13 @@ export function negotiateApiVersion<T>(client: T): T {
 export async function apiFetch(path: string, apiVersion: string, init: RequestInit = {}): Promise<Response> {
   const base = /^https?:\/\//i.test(path) ? "" : await collectionUrl();
   return withApiVersion(apiVersion, async (version) => {
-    const token = await SDK.getAccessToken();
     const url = `${base}${path}${path.includes("?") ? "&" : "?"}api-version=${version}`;
-    const res = await fetch(url, { ...init, headers: { ...(init.headers as Record<string, string>), Authorization: `Bearer ${token}` } });
+    const send = async (rejected: boolean) => {
+      const token = await getFreshAccessToken(rejected);
+      return fetch(url, { ...init, headers: { ...(init.headers as Record<string, string>), Authorization: `Bearer ${token}` } });
+    };
+    let res = await send(false);
+    if (res.status === 401) res = await send(true);
     if (!res.ok) {
       const body = await res.text().catch(() => "");
       let message = `Request failed (${res.status})`;
