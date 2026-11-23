@@ -33,13 +33,17 @@ export function withTrailingSlash(url: string): string {
 
 let lastToken: string | undefined;
 
-/** Expiry (ms) of the extension token: its `ado_exp` claim, which Azure DevOps enforces before the AAD `exp`. */
-function tokenExpiry(token: string): number | undefined {
+/**
+ * Expiry (ms) of the extension token: its `ado_exp` claim, which Azure DevOps enforces before the AAD `exp`
+ * (`hostUntil`, when the host replaces its cached token).
+ */
+function tokenExpiry(token: string): { exp: number; hostUntil?: number } | undefined {
   try {
     const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
     const attrs = Object.values(payload.xms_attr ?? {}) as { ado_exp?: number }[];
     const exp = attrs.map((a) => a?.ado_exp).find((e): e is number => typeof e === "number") ?? payload.exp;
-    return typeof exp === "number" ? exp * 1000 : undefined;
+    if (typeof exp !== "number") return undefined;
+    return { exp: exp * 1000, hostUntil: typeof payload.exp === "number" ? payload.exp * 1000 : undefined };
   } catch {
     return undefined;
   }
@@ -53,15 +57,26 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * again until the host serves a different one that is still valid.
  */
 export async function getFreshAccessToken(rejected = false): Promise<string> {
+  const isExpired = (t: string) => {
+    const info = tokenExpiry(t);
+    return info !== undefined && info.exp < Date.now() + 15_000;
+  };
   let token = await SDK.getAccessToken();
   for (let attempt = 1; attempt <= 4; attempt++) {
-    const exp = tokenExpiry(token);
-    const stale = (rejected && token === lastToken) || (exp !== undefined && exp < Date.now() + 15_000);
-    if (!stale) break;
+    if (!((rejected && token === lastToken) || isExpired(token))) break;
     await sleep(600 * attempt);
     token = await SDK.getAccessToken();
   }
   lastToken = token;
+  if (isExpired(token)) {
+    // The host keeps serving its cached token until the AAD expiry; nothing in the extension can renew it earlier.
+    const until = tokenExpiry(token)?.hostUntil;
+    const when = until ? ` at ${new Date(until).toLocaleTimeString()}` : " shortly";
+    throw Object.assign(
+      new Error(`Azure DevOps handed this extension an expired access token. It renews it${when}; reload the page then.`),
+      { status: 401 }
+    );
+  }
   return token;
 }
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.7
+
+- When the host serves an expired access token the extension now says so, with the time the host renews it, instead of showing TF400813
+
 ## 0.3.6
 
 - Fixed: requests failing with TF400813 (unauthorized) after the page had been open for a while; the extension now asks the host for a new access token when the cached one has expired or is rejected
