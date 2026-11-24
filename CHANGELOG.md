@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.3.8
+
+- The file filter can exclude files: prefix a term with `!` (for example `!test`, or `src !test`) to hide files whose path contains it; several terms must all match
+
 ## 0.3.7
 
 - When the host serves an expired access token the extension now says so, with the time the host renews it, instead of showing TF400813

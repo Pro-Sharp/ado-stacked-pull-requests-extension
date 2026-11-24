@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildTree, changeLetter, flattenTree } from "../src/ui/pr/tree";
+import { buildTree, changeLetter, flattenTree, matchesFileFilter } from "../src/ui/pr/tree";
 
 describe("file tree", () => {
   const files = [{ path: "/docs/research/b.md" }, { path: "/README.md" }, { path: "/docs/research/a.md" }, { path: "/docs/x.md" }];
@@ -30,5 +30,27 @@ describe("file tree", () => {
     expect(changeLetter(2)).toBe("M");
     expect(changeLetter(16)).toBe("D");
     expect(changeLetter(8 | 2)).toBe("R");
+  });
+});
+
+describe("file filter", () => {
+  it("matches plain terms case-insensitively, all of them", () => {
+    expect(matchesFileFilter("/src/App.tsx", "app")).toBe(true);
+    expect(matchesFileFilter("/src/App.tsx", "src app")).toBe(true);
+    expect(matchesFileFilter("/src/App.tsx", "src lib")).toBe(false);
+    expect(matchesFileFilter("/src/App.tsx", "")).toBe(true);
+  });
+
+  it("hides files matching a !term", () => {
+    expect(matchesFileFilter("/src/App.test.ts", "!test")).toBe(false);
+    expect(matchesFileFilter("/src/App.ts", "!test")).toBe(true);
+    expect(matchesFileFilter("/test/App.ts", "!TEST")).toBe(false);
+  });
+
+  it("combines include and exclude terms and ignores a lone !", () => {
+    expect(matchesFileFilter("/src/App.ts", "src !test")).toBe(true);
+    expect(matchesFileFilter("/src/App.test.ts", "src !test")).toBe(false);
+    expect(matchesFileFilter("/lib/App.ts", "src !test")).toBe(false);
+    expect(matchesFileFilter("/src/App.ts", "!")).toBe(true);
   });
 });

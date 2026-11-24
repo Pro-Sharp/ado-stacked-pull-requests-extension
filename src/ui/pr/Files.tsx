@@ -9,7 +9,7 @@ import { PrInfo } from "../../core/stack/types";
 import { ErrorBanner, MoreSentinel, Spinner, useAsync, useIncremental } from "../common/components";
 import { dirName, fileName } from "../common/format";
 import { useService } from "../context";
-import { buildTree, changeLetter, flattenTree, treeOrder } from "./tree";
+import { buildTree, changeLetter, flattenTree, matchesFileFilter, treeOrder } from "./tree";
 import { Composer, ThreadView } from "./Threads";
 
 export type DiffMode = "layer" | "all";
@@ -149,7 +149,7 @@ export function FilesView({ pr, parent, iterations, threads, mode, onModeChange,
   const [filter, setFilter] = React.useState("");
   const [showInherited, setShowInherited] = React.useState(false);
 
-  const files = React.useMemo(() => treeOrder((fileSet.data?.files ?? []).filter((f) => f.path.toLowerCase().includes(filter.toLowerCase()))), [fileSet.data, filter]);
+  const files = React.useMemo(() => treeOrder((fileSet.data?.files ?? []).filter((f) => matchesFileFilter(f.path, filter))), [fileSet.data, filter]);
   const buckets = React.useMemo(() => bucketThreads(threads, new Set((fileSet.data?.files ?? []).map((f) => f.path))), [threads, fileSet.data]);
   const tree = React.useMemo(() => flattenTree(buildTree(files), collapsed), [files, collapsed]);
   const shown = selected ? files.filter((f) => f.path === selected) : files;
@@ -187,7 +187,7 @@ export function FilesView({ pr, parent, iterations, threads, mode, onModeChange,
             <button className="active">All changes</button>
           </span>
         )}
-        <input className="sp-input" placeholder="Filter files" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <input className="sp-input" placeholder="Filter files (!test excludes)" title="Space-separated terms; prefix a term with ! to hide matching files, e.g. src !test" value={filter} onChange={(e) => setFilter(e.target.value)} />
         <span className="count">{files.length} changed files</span>
         {mode === "layer" && parent && (
           <span className="sp-muted" style={{ fontSize: 12 }}>

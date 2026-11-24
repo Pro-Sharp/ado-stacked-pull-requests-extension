@@ -65,3 +65,16 @@ export function changeLetter(changeType: number): "A" | "M" | "D" | "R" {
   if (changeType & (8 | 1024 | 2048)) return "R";
   return "M";
 }
+
+/**
+ * Matches a file path against a filter query: space-separated terms, case-insensitive substring match.
+ * Plain terms must all match; a term starting with `!` excludes paths containing it (`src !test`).
+ */
+export function matchesFileFilter(path: string, query: string): boolean {
+  const p = path.toLowerCase();
+  for (const term of query.toLowerCase().split(/\s+/)) {
+    if (!term || term === "!") continue;
+    if (term.startsWith("!") ? p.includes(term.slice(1)) : !p.includes(term)) return false;
+  }
+  return true;
+}
