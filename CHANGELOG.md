@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.0
+
+- Code in the file diffs is syntax-highlighted like in an IDE (TypeScript/JavaScript, C#, Java, Python, Go, JSON, CSS, XML/HTML, YAML, SQL, shell and more), in light and dark themes; unknown file types and very large files stay plain
+
 ## 0.3.8
 
 - The file filter can exclude files: prefix a term with `!` (for example `!test`, or `src !test`) to hide files whose path contains it; several terms must all match

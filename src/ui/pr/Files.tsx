@@ -2,6 +2,7 @@ import * as React from "react";
 import { GitPullRequestCommentThread, GitPullRequestIteration } from "azure-devops-extension-api/Git";
 import { LayerFile } from "../../core/api/services";
 import { anchorForRow } from "../../core/diff/anchors";
+import { highlightLines, languageForPath } from "../../core/diff/highlight";
 import { buildDiffRows, DiffRow, expandGap } from "../../core/diff/lineDiff";
 import { bucketThreads, placeThreads } from "../../core/diff/threads";
 import { buildThreadPayload, fallbackComment } from "../../core/diff/threadPayload";
@@ -264,6 +265,12 @@ export function FilesView({ pr, parent, iterations, threads, mode, onModeChange,
   );
 }
 
+/** A code line; syntax-highlighted when the file type is known (the HTML comes from highlight.js, which escapes the source). */
+function CodeCell({ row, oldHtml, newHtml }: { row: DiffRow; oldHtml?: string[]; newHtml?: string[] }) {
+  const html = row.type === "delete" ? oldHtml?.[(row.oldLine ?? 0) - 1] : newHtml?.[(row.newLine ?? 0) - 1];
+  return html === undefined ? <td className="code">{row.text}</td> : <td className="code" dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
 function DiffFile({ pr, file, set, iterationId, threads, onChanged }: {
   pr: PrInfo;
   file: FileEntry;
@@ -302,7 +309,17 @@ function DiffFile({ pr, file, set, iterationId, threads, onChanged }: {
       isAdd ? Promise.resolve("") : service.getFileText(pr.repositoryId, oldPath, set.baseSha),
       isDelete ? Promise.resolve("") : service.getFileText(pr.repositoryId, file.path, set.headSha)
     ]);
-    return { oldText, newText, full: buildDiffRows(oldText, newText, -1), collapsed: buildDiffRows(oldText, newText, 3), newLines: newText.split(/\r?\n/) };
+    const language = languageForPath(file.path);
+    return {
+      oldText,
+      newText,
+      full: buildDiffRows(oldText, newText, -1),
+      collapsed: buildDiffRows(oldText, newText, 3),
+      newLines: newText.split(/\r?\n/),
+      // Syntax-highlighted HTML per line of each version (undefined for unknown or very large files).
+      oldHtml: highlightLines(oldText, language),
+      newHtml: highlightLines(newText, language)
+    };
   }, [file.path, set.baseSha, set.headSha]);
 
   const result = content.data;
@@ -386,7 +403,7 @@ function DiffFile({ pr, file, set, iterationId, threads, onChanged }: {
                           <button className="plus-btn" title="Add a comment" onClick={() => setComposeAt(row)}>+</button>
                         </td>
                         <td className="sign">{row.type === "add" ? "+" : row.type === "delete" ? "-" : ""}</td>
-                        <td className="code">{row.text}</td>
+                        <CodeCell row={row} oldHtml={result.oldHtml} newHtml={result.newHtml} />
                       </tr>
                       {inline && (
                         <tr className="threads">

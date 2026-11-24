@@ -18,6 +18,15 @@
   --sp-danger: #c50f1f;
   --sp-shadow: 0 1.6px 3.6px rgba(0, 0, 0, 0.13), 0 0.3px 0.9px rgba(0, 0, 0, 0.1);
   --sp-active-bg: rgba(0, 120, 212, 0.1);
+  --sp-tok-keyword: #0000ff;
+  --sp-tok-string: #a31515;
+  --sp-tok-comment: #008000;
+  --sp-tok-number: #098658;
+  --sp-tok-type: #267f99;
+  --sp-tok-title: #795e26;
+  --sp-tok-attr: #e50000;
+  --sp-tok-variable: #001080;
+  --sp-tok-meta: #af00db;
 }
 
 // The palette follows the host theme (see ui/theme.ts), which can differ from the OS setting.
@@ -33,6 +42,15 @@
   --sp-add-num: #264a26;
   --sp-del-bg: #3d2020;
   --sp-del-num: #4d2828;
+  --sp-tok-keyword: #569cd6;
+  --sp-tok-string: #ce9178;
+  --sp-tok-comment: #6a9955;
+  --sp-tok-number: #b5cea8;
+  --sp-tok-type: #4ec9b0;
+  --sp-tok-title: #dcdcaa;
+  --sp-tok-attr: #9cdcfe;
+  --sp-tok-variable: #9cdcfe;
+  --sp-tok-meta: #c586c0;
 }
 
 // Without a detected theme (e.g. a host that sets no background) fall back to the OS preference.
@@ -48,6 +66,15 @@
     --sp-add-num: #264a26;
     --sp-del-bg: #3d2020;
     --sp-del-num: #4d2828;
+    --sp-tok-keyword: #569cd6;
+    --sp-tok-string: #ce9178;
+    --sp-tok-comment: #6a9955;
+    --sp-tok-number: #b5cea8;
+    --sp-tok-type: #4ec9b0;
+    --sp-tok-title: #dcdcaa;
+    --sp-tok-attr: #9cdcfe;
+    --sp-tok-variable: #9cdcfe;
+    --sp-tok-meta: #c586c0;
   }
 }
 
@@ -909,6 +936,69 @@ button {
   .code {
     white-space: pre-wrap;
     word-break: break-all;
+    // Syntax highlighting (highlight.js classes); the colours follow the host theme like the rest of the diff.
+    .hljs-keyword,
+    .hljs-literal,
+    .hljs-built_in,
+    .hljs-selector-tag,
+    .hljs-doctag {
+      color: var(--sp-tok-keyword);
+    }
+    .hljs-string,
+    .hljs-regexp,
+    .hljs-template-variable,
+    .hljs-selector-attr,
+    .hljs-selector-pseudo,
+    .hljs-link {
+      color: var(--sp-tok-string);
+    }
+    .hljs-comment,
+    .hljs-quote {
+      color: var(--sp-tok-comment);
+      font-style: italic;
+    }
+    .hljs-number,
+    .hljs-symbol,
+    .hljs-bullet {
+      color: var(--sp-tok-number);
+    }
+    .hljs-type,
+    .hljs-selector-class {
+      color: var(--sp-tok-type);
+    }
+    .hljs-title,
+    .hljs-section {
+      color: var(--sp-tok-title);
+    }
+    .hljs-attr,
+    .hljs-attribute,
+    .hljs-name,
+    .hljs-property {
+      color: var(--sp-tok-attr);
+    }
+    .hljs-variable,
+    .hljs-params,
+    .hljs-selector-id {
+      color: var(--sp-tok-variable);
+    }
+    .hljs-meta,
+    .hljs-tag,
+    .hljs-subst {
+      color: var(--sp-tok-meta);
+    }
+    .hljs-title.class_,
+    .hljs-title.class_.inherited__ {
+      color: var(--sp-tok-type);
+    }
+    .hljs-params .hljs-attr {
+      color: var(--sp-tok-variable);
+    }
+    .hljs-emphasis {
+      font-style: italic;
+    }
+    .hljs-strong {
+      font-weight: 700;
+    }
   }
   tr.add td {
     background: var(--sp-add-bg);
